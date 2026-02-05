@@ -1,0 +1,29 @@
+1. pnpm install express
+express框架
+
+2. pnpm install mysql2
+安装mysql配置
+
+3. pnpm install jsonwebtoken
+生成和验证JWT--用来认证和授权
+
+4. pnpm add cors
+跨域--让前端能够调用后端接口
+
+5. pnpm install bcryptjs
+密码加密（哈希）存储--注册时把明文密码变成哈希再存
+
+6. pnpm install axios
+axios请求访问其他网络资源
+
+7. pnpm install nodemailer
+发送SMTP邮件
+
+8. pnpm install redis
+将零时数据存储到redis中
+
+9. pnpm install multer
+文件上传工具将前端的数据传输到后端
+
+10. pnpm install dayjs
+按照指定格式模板格式化时间戳

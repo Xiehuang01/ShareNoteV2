@@ -1,0 +1,65 @@
+# 一级路由
+    🚀登录/注册/login
+      🟩后端:
+        🟢登录时使用jwt加密{id}生成token
+          const SECRET_KEY = aqgy1213812138
+          const id = rows[0].id
+          const newToken = jwt.sign(
+              {id},
+              SECRET_KEY
+          )
+        🟢登录时使用bcrypt.compareSync解密密码
+          const isMatch = bcrypt.compareSync(password, rows[0].password)
+        🟢注册时使用bcrypt.hashSync加密密码
+          const hashPassword = bcrypt.hashSync(password, 10)
+        🟢注册时使用了geetest的二次校验验证行为校验
+        🟢注册时使用了nodemailer来发送邮箱验证码
+      🟨前端:
+        🟡使用el-from表单组件
+        🟡将token存入到pinia的store中,用了pinia插件实现了本地化存储
+        🟡使用geetest发起行为校验
+        🟡用了setInterval来处理防抖
+    🚀忘记密码/forgetPassword
+      🟩后端
+        🟢使用nodemailer来发送验证码
+      🟨前端
+    🚀首页/main
+      🟩后端
+        🟢调用token并使用jwt.verify(token, SECRET_KEY)解密出用户的id
+        🟢通过id来获取用户基本信息并存入到store中
+      🟨前端
+        🟡
+      #窗口
+        切换分组ChangeGroup
+          -静态设计
+          -动态设计
+        加入分组AddGroup
+          -静态设计
+          -动态设计
+        上传文件AddNotes
+          🟢通过multer将前端上传的文件保存下来
+      # 二级路由
+        💾笔记页面/notesPage
+          🟡使用了marked生成出Markdown预览页面
+          🟡使用hljs使得Markdown中的代码块实现高亮
+          🟡使用el-upload来上传文件
+        💾设置页面/settings
+        💾个人简介/profile
+          🟡调用store中存储的userInfo获取用户个人信息
+# 路由守卫
+    🟢使用beforeEach判断用户是否有token
+
+# 请求拦截器设计
+  🟡 对于请求体--将token存入config.headers.Authorization
+      (config) => {
+        const userStore = useUserStore()
+        if (userStore.token) {
+          // 存在token
+          config.headers.Authorization = userStore.token
+        }
+        return config
+      }
+  🟡 对于响应体--返回res的data
+      (res) => {
+        return res.data
+      }

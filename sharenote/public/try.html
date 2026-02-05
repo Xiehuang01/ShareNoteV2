@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子效果登录页面 (绿色主题)</title>
+    
+    <style>
+        /* --- 基础和全局设置 --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            /* 使用 Grid 布局轻松实现垂直水平居中 */
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            overflow: hidden; /* 隐藏滚动条 */
+        }
+
+        /* --- 粒子背景 --- */
+        #particles-js {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            /* 背景修改为黑色系 */
+            background-color: #0a0a0a;
+            background-image: linear-gradient(180deg, #000000 0%, #111111 100%);
+            /* 确保在最底层 */
+            z-index: -1;
+        }
+
+        /* --- 登录卡片 --- */
+        .login-container {
+            position: relative;
+            width: 360px;
+            padding: 3rem 2rem;
+            color: white;
+            text-align: center;
+            
+            /* 玻璃拟态 (Glassmorphism) 核心 */
+            background: rgba(255, 255, 255, 0.05); /* 更透明的背景，突出黑色主题 */
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 255, 127, 0.2); /* 边框使用半透明绿色 */
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+
+            /* 3D 倾斜效果的过渡 */
+            transition: transform 0.1s linear;
+        }
+
+        .login-container h2 {
+            margin-bottom: 2rem;
+            font-weight: 500;
+        }
+
+        /* --- 浮动标签输入框 --- */
+        .input-group {
+            position: relative;
+            margin-bottom: 2.5rem;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px 0;
+            font-size: 1rem;
+            color: white;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            outline: none;
+        }
+
+        .input-group label {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.6);
+            pointer-events: none;
+            transition: 0.3s ease all;
+        }
+
+        /* * 交互核心：浮动标签和焦点绿光 */
+        .input-group input:focus + label,
+        .input-group input:valid + label {
+            top: -15px;
+            font-size: 0.8rem;
+            color: #00FF7F; /* 焦点使用亮绿色 */
+        }
+        
+        .input-group input:focus {
+            /* 焦点时添加绿色底部阴影，增强科技感 */
+            box-shadow: 0 1px 0 0 #00FF7F; 
+        }
+
+        /* --- 按钮和链接 --- */
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 25px;
+            background: #00A86B; /* 按钮使用主绿色 */
+            color: black; /* 按钮文字使用黑色以增强对比度 */
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.1s ease;
+        }
+
+        button:hover {
+            background: #00FF7F; /* 悬停时使用亮绿色 */
+            color: black;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .links {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1.5rem;
+        }
+
+        .links a {
+            color: rgba(0, 255, 127, 0.8); /* 链接使用淡绿色 */
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .links a:hover {
+            color: #00FF7F;
+            text-decoration: underline;
+        }
+    </style>
+    </head>
+<body>
+    
+    <div id="particles-js"></div>
+
+    <div class="login-container">
+        <form id="login-form">
+            <h2>欢迎回来</h2>
+            
+            <div class="input-group">
+                <input type="text" id="username" required>
+                <label for="username">用户名</label>
+            </div>
+            
+            <div class="input-group">
+                <input type="password" id="password" required>
+                <label for="password">密码</label>
+            </div>
+            
+            <button type="submit">登 录</button>
+            
+            <div class="links">
+                <a href="#">忘记密码?</a>
+                <a href="#">注册新帐户</a>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+
+    <script>
+        /* --- 1. 启动 Particles.js --- */
+
+        // 这是 particles.js 的标准配置
+        particlesJS("particles-js", {
+            particles: {
+                number: {
+                    value: 80, // 粒子数量
+                    density: {
+                        enable: true,
+                        value_area: 800
+                    }
+                },
+                color: {
+                    value: "#00FF7F" // 粒子颜色改为亮绿色
+                },
+                shape: {
+                    type: "circle"
+                },
+                opacity: {
+                    value: 0.5,
+                    random: false
+                },
+                size: {
+                    value: 3,
+                    random: true
+                },
+                line_linked: {
+                    enable: true,
+                    distance: 150,
+                    color: "#00FF7F", // 连线颜色改为亮绿色
+                    opacity: 0.4,
+                    width: 1
+                },
+                move: {
+                    enable: true,
+                    speed: 2,
+                    direction: "none",
+                    random: false,
+                    straight: false,
+                    out_mode: "out",
+                    bounce: false
+                }
+            },
+            interactivity: {
+                detect_on: "canvas",
+                events: {
+                    onhover: {
+                        enable: true,
+                        mode: "grab"
+                    },
+                    onclick: {
+                        enable: true,
+                        mode: "push"
+                    },
+                    resize: true
+                },
+                modes: {
+                    grab: {
+                        distance: 140,
+                        line_opacity: 1
+                    },
+                    push: {
+                        particles_nb: 4
+                    }
+                }
+            },
+            retina_detect: true
+        });
+
+
+        /* --- 2. 登录卡片 3D 倾斜交互 --- */
+
+        const loginContainer = document.querySelector('.login-container');
+        const body = document.body;
+
+        body.addEventListener('mousemove', (e) => {
+            const x = (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
+            const y = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+            const maxTilt = 10; 
+            const tiltY = x * maxTilt;
+            const tiltX = -y * maxTilt;
+
+            // 应用 3D 变换
+            loginContainer.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+        });
+
+        // 鼠标离开窗口时重置卡片
+        body.addEventListener('mouseleave', () => {
+            loginContainer.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
+        });
+
+
+        /* --- 3. (可选) 阻止表单默认提交 --- */
+        const loginForm = document.getElementById('login-form');
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            console.log('表单已提交！');
+        });
+    </script>
+    </body>
+</html>`    

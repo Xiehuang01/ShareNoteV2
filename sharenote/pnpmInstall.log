@@ -1,0 +1,51 @@
+1. lint-staged ==> pnpm i lint-staged -D
+只对 Git 暂存区（staged）的文件运行 lint 或格式化，提高速度、避免不必要的检查
+
+2. pnpm dlx husky-init && pnpm install
+在执行 git 命令（如 commit / push）之前，自动运行你的脚本，确保代码质量和规范
+你可以让 Git 在提交前帮你检查代码、自动修复格式、跑测试、检查安全风险……
+只要检查不通过，git commit 会被阻止，避免垃圾代码进入仓库。
+
+3. pnpm add -D eslint-config-prettier eslint-plugin-prettier prettier
+关注 代码排版和可读性
+自动处理：
+缩进、换行
+空格、分号、引号
+数组/对象末尾逗号
+
+4. pnpm add pinia-plugin-persistedstate -D
+Pinia的持久化存储插件
+
+5. pnpm install element-plus
+element plus组件库
+
+6. pnpm install -D unplugin-vue-components unplugin-auto-import
+element plus组件库按需导入的插件
+
+7. pnpm add @element-plus/icons-vue
+element plus图标组件
+
+8. pnpm install -D sass
+CSS 预处理器
+
+9. pnpm add postcss-pxtorem -D
+自动把 px 转 rem
+
+10. pnpm install axios
+axios请求访问网络资源
+
+11. pnpm install marked
+MarkedDown预览工具
+
+12. pnpm install highlight.js
+MarkDown代码块高亮
+
+13. pnpm install marked-gfm-heading-id
+marked 的扩展插件，专门用来生成 GitHub 风格的标题 id(slug),
+它会帮你处理英文、中文、重复标题等问题，不需要自己手写 generateId 函数
+
+14. pnpm add @panzoom/panzoom
+图片渲染工具
+
+15. pnpm install vue-pdf-embed
+vue的pdf查看工具
