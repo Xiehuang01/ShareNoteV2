@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import ChangeGroup from '@/components/ChangeGroup.vue'
@@ -25,6 +25,7 @@ import {
   Memo
 } from '@element-plus/icons-vue'
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const ChangeGroupRef = ref(null)
@@ -136,6 +137,78 @@ const getUserNotesList = async () => {
 }
 getUserNotesList()
 
+// 监听路由变化，自动恢复对应页面的菜单状态（不用 immediate，以避免 DOM 未挂载时的问题）
+watch(
+  () => route.path,
+  (newPath) => {
+    if (newPath === '/main/settings') {
+      isActivedClick.value = 'Settings'
+      isMenuDisabled.value = true
+      // 收起菜单（只在 DOM 元素存在时）
+      if (menu.value && menuSearchUpload.value && isExpand.value) {
+        menu.value.style.width = '0px'
+        menuSearchUpload.value.style.display = 'none'
+        menu.value.style.borderRight = 'none'
+        isExpand.value = false
+      }
+    } else if (newPath === '/main/profile') {
+      isActivedClick.value = 'Profile'
+      isMenuDisabled.value = true
+      // 收起菜单（只在 DOM 元素存在时）
+      if (menu.value && menuSearchUpload.value && isExpand.value) {
+        menu.value.style.width = '0px'
+        menuSearchUpload.value.style.display = 'none'
+        menu.value.style.borderRight = 'none'
+        isExpand.value = false
+      }
+    } else if (newPath === '/') {
+      isActivedClick.value = 'Home'
+      isMenuDisabled.value = false
+      // 展开菜单（只在 DOM 元素存在时）
+      if (menu.value && menuSearchUpload.value && !isExpand.value) {
+        menu.value.style.width = '220px'
+        menuSearchUpload.value.style.display = 'flex'
+        menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
+        isExpand.value = true
+      }
+    }
+  }
+)
+
+// 组件挂载时初始化菜单状态
+onMounted(() => {
+  const currentPath = route.path
+  if (currentPath === '/main/settings') {
+    isActivedClick.value = 'Settings'
+    isMenuDisabled.value = true
+    isExpand.value = false
+    if (menu.value) {
+      menu.value.style.width = '0px'
+      menuSearchUpload.value.style.display = 'none'
+      menu.value.style.borderRight = 'none'
+    }
+  } else if (currentPath === '/main/profile') {
+    isActivedClick.value = 'Profile'
+    isMenuDisabled.value = true
+    isExpand.value = false
+    if (menu.value) {
+      menu.value.style.width = '0px'
+      menuSearchUpload.value.style.display = 'none'
+      menu.value.style.borderRight = 'none'
+    }
+  } else {
+    // 默认状态（主页或其他页面）- 展开菜单
+    isActivedClick.value = 'Home'
+    isMenuDisabled.value = false
+    isExpand.value = true
+    if (menu.value) {
+      menu.value.style.width = '220px'
+      menuSearchUpload.value.style.display = 'flex'
+      menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
+    }
+  }
+})
+
 // 规定笔记时间的显示格式
 const formatDate = (isoString) => {
   if (!isoString) return ''
@@ -161,6 +234,7 @@ const TagColor = (fileType) => {
 const clickNotesActivedId = ref(null)
 const selectedFileName = ref('welcome.md')
 const selectedFileType = ref('')
+const selectedFileCustomName = ref(' ')
 
 // 判断是否为 Markdown 文件
 const isMarkdownFile = (fileType) => {
@@ -190,10 +264,11 @@ const filteredNotesList = computed(() => {
 })
 
 // 点击对应的笔记
-const clickNotes = (fileId, fileName, fileType) => {
+const clickNotes = (fileId, fileName, fileType, fileCustomName) => {
   clickNotesActivedId.value = fileId
   selectedFileName.value = fileName
   selectedFileType.value = fileType
+  selectedFileCustomName.value = fileCustomName
 
   // 检查是否为非 Markdown 文件
   const isMarkdown = isMarkdownFile(fileType)
@@ -237,7 +312,7 @@ const deleteFile = async () => {
   try {
     // 显示确认对话框
     await ElMessageBox.confirm(
-      `确定要删除 "${selectedFileName.value}" 吗？`,
+      `确定要删除 "${selectedFileCustomName.value}" 吗？`,
       '删除确认',
       {
         confirmButtonText: '确定',
@@ -391,7 +466,12 @@ const deleteFile = async () => {
               <el-button
                 :icon="Plus"
                 color="#13ba81"
-                style="letter-spacing: 3px; font-weight: bold; width: 100%"
+                style="
+                  letter-spacing: 3px;
+                  font-weight: bold;
+                  width: 100%;
+                  margin-top: 10px;
+                "
                 @click="AddNotesRef.turnonAddNote()"
                 >上传笔记</el-button
               >
@@ -405,7 +485,14 @@ const deleteFile = async () => {
                   :class="{
                     isClickedNote: item.fileId === clickNotesActivedId
                   }"
-                  @click="clickNotes(item.fileId, item.fileName, item.fileType)"
+                  @click="
+                    clickNotes(
+                      item.fileId,
+                      item.fileName,
+                      item.fileType,
+                      item.fileCustomName
+                    )
+                  "
                 >
                   <p class="p-title">{{ item.fileCustomName }}</p>
                   <div class="timeAndTag-wrapper">
@@ -857,7 +944,7 @@ const deleteFile = async () => {
             .search-result-count {
               font-size: 12px;
               color: rgb(68, 78, 97);
-              padding: 5px 10px;
+              padding: 10px 10px 0px 10px;
               text-align: center;
             }
 
