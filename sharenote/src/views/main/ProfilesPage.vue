@@ -106,6 +106,11 @@ const getAvatarUrl = () => {
   }
   return '/src/assets/d1a5429ead3d892513c3180e2aebb940.png'
 }
+
+// 修改密码
+const changePassword = () => {
+  router.push('/forgetpassword')
+}
 </script>
 
 <template>
@@ -241,7 +246,10 @@ const getAvatarUrl = () => {
               <span class="security-title">账户密码</span>
               <span class="security-desc">定期更换密码可以保护账户安全</span>
             </div>
-            <el-button class="btn-change-password" size="small"
+            <el-button
+              class="btn-change-password"
+              size="small"
+              @click="changePassword"
               >修改密码</el-button
             >
           </div>

@@ -1,5 +1,13 @@
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import {
+  ref,
+  onMounted,
+  nextTick,
+  watch,
+  onBeforeUnmount,
+  onActivated,
+  onDeactivated
+} from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css' // 高亮主题
@@ -30,6 +38,9 @@ const isloading = ref(null)
 
 const isImageType = ref(false)
 
+// 图片类型列表（支持常见图片格式）
+const imageTypes = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico']
+
 const html = ref(null) // Markdown HTML
 const toc = ref([]) // 目录
 
@@ -37,6 +48,8 @@ const toc = ref([]) // 目录
 const getFileName = ref(props.fileName || 'welcome.md')
 const getFileType = ref(props.fileType.split('/')[1])
 let headingCount = 0
+// 用于保存所有创建的定时器 id，便于在停用/卸载时清理
+const pendingTimeouts = []
 
 // 触发disabledDirectory
 // const triggerDisabledDirectory = () => {
@@ -49,17 +62,28 @@ watch(
   ([newFileName, newFileType]) => {
     if (newFileName) {
       getFileName.value = newFileName
-      getFileType.value = newFileType.split('/')[1]
-      isImageType.value = ['png', 'jpg', 'jpeg'].includes(getFileType.value)
-      // 关键：清空 html 和 toc，让 v-if 不成立
+      // 处理 fileType，可能是 'image/png' 格式或直接的 'png' 格式
+      const typeStr = newFileType || ''
+      getFileType.value = typeStr.includes('/')
+        ? typeStr.split('/')[1]
+        : typeStr
+
+      // 使用更完善的图片类型判断
+      isImageType.value = imageTypes.includes(getFileType.value.toLowerCase())
+
+      // 关键：清空 html 和 toc，重置状态
       html.value = null
       toc.value = []
+      imageUrl.value = ''
+      pdfUrl.value = ''
+      destroyPanzoom()
+
       console.log(
         '文件名: ' +
           getFileName.value +
           '\n文件类型: ' +
           getFileType.value +
-          '\n是否为图片' +
+          '\n是否为图片: ' +
           isImageType.value
       )
 
@@ -75,19 +99,25 @@ watch(
         console.log('这是PDF文件，立即关闭目录')
         loadPdfFile()
         // 立即关闭目录
-        setTimeout(() => {
+        const _pdfTid = setTimeout(() => {
           console.log('PDF文件：强制执行 toggleDirectoryStatus(false)')
           toggleDirectoryStatus(false)
         }, 200)
-      } else {
-        // 其他文件类型
-        console.log('这是其他文件类型，立即关闭目录')
+        pendingTimeouts.push(_pdfTid)
+      } else if (isImageType.value) {
+        // 图片文件
+        console.log('这是图片文件，立即关闭目录')
         loadImageFile()
         // 立即关闭目录
-        setTimeout(() => {
-          console.log('其他文件：强制执行 toggleDirectoryStatus(false)')
+        const _imgTid = setTimeout(() => {
+          console.log('图片文件：强制执行 toggleDirectoryStatus(false)')
           toggleDirectoryStatus(false)
         }, 200)
+        pendingTimeouts.push(_imgTid)
+      } else {
+        // 未知文件类型，显示空状态
+        console.log('未知文件类型:', getFileType.value)
+        isloading.value = false
       }
     }
   }
@@ -130,13 +160,14 @@ const loadMarkdownFile = async () => {
 
     html.value = htmlArr.join('')
 
-    // 3. 高亮代码块
-    nextTick(() => {
+    // 3. 高亮代码块（延迟以确保 DOM 就绪），并记录定时器以便清理
+    const _hlTid = setTimeout(() => {
       document.querySelectorAll('.markdown-body pre code').forEach((block) => {
         block.classList.add('hljs')
         hljs.highlightElement(block)
       })
     })
+    pendingTimeouts.push(_hlTid)
   } catch (error) {
     console.error('加载文件失败:', error)
     html.value = '<p>文件加载失败，请检查文件是否存在。</p>'
@@ -149,6 +180,42 @@ const loadMarkdownFile = async () => {
 
 const imageUrl = ref('')
 const panzoomInstance = ref(null)
+const wheelHandler = ref(null)
+
+// 初始化 Panzoom 的独立函数（供加载和 keep-alive 恢复时使用）
+const initPanzoomForImage = () => {
+  const imgEl = document.querySelector('#panzoomImg')
+  if (!imgEl) return
+
+  // 销毁旧实例
+  if (panzoomInstance.value) {
+    try {
+      panzoomInstance.value.destroy()
+    } catch {
+      // ignore
+    }
+    panzoomInstance.value = null
+  }
+
+  // 移除旧的事件监听
+  if (wheelHandler.value && imgEl.parentElement) {
+    imgEl.parentElement.removeEventListener('wheel', wheelHandler.value)
+    wheelHandler.value = null
+  }
+
+  // 初始化 Panzoom
+  panzoomInstance.value = Panzoom(imgEl, {
+    maxScale: 5,
+    minScale: 0.1
+  })
+
+  // 使用绑定后的 handler，便于移除
+  wheelHandler.value = panzoomInstance.value.zoomWithWheel.bind(
+    panzoomInstance.value
+  )
+  imgEl.parentElement.addEventListener('wheel', wheelHandler.value)
+}
+
 // 加载图片的函数
 const loadImageFile = async () => {
   try {
@@ -158,60 +225,90 @@ const loadImageFile = async () => {
     await nextTick()
 
     const imgEl = document.querySelector('#panzoomImg')
-    if (!imgEl) return
-
-    // 封装初始化逻辑
-    const initPanzoomInstance = () => {
-      // 销毁旧实例
-      if (panzoomInstance.value) {
-        panzoomInstance.value.destroy()
-        panzoomInstance.value = null
-      }
-
-      // --- 新增：计算自适应比例 (Contain 逻辑) ---
-      // const container = imgEl.parentElement
-      // const containerWidth = container.clientWidth
-      // const containerHeight = container.clientHeight
-      // const imgWidth = imgEl.naturalWidth || imgEl.width
-      // const imgHeight = imgEl.naturalHeight || imgEl.height
-
-      // 计算宽和高的缩放比
-      // const scaleX = containerWidth / imgWidth
-      // const scaleY = containerHeight / imgHeight
-
-      // 取较小的值，保证宽高都能塞进去
-      // 如果图片本身比容器小，取 1 (不自动放大模糊)
-      // const fitScale = Math.min(scaleX, scaleY, 1)
-      // ---------------------------------------
-
-      panzoomInstance.value = Panzoom(imgEl, {
-        maxScale: 5,
-        minScale: 0.1 // 允许缩得更小
-        // contain: 'inside',
-        // startScale: fitScale, // <--- 关键：使用计算出的比例启动
-        // startX: 0,
-        // startY: 0
-      })
-
-      imgEl.parentElement.addEventListener(
-        'wheel',
-        panzoomInstance.value.zoomWithWheel
-      )
+    if (!imgEl) {
+      isloading.value = false
+      return
     }
 
     if (imgEl.complete && imgEl.naturalWidth > 0) {
-      initPanzoomInstance()
+      initPanzoomForImage()
+      isloading.value = false
     } else {
       imgEl.onload = () => {
-        initPanzoomInstance()
+        initPanzoomForImage()
+        isloading.value = false
+      }
+      imgEl.onerror = () => {
+        console.error('图片加载失败:', imageUrl.value)
+        isloading.value = false
       }
     }
   } catch (error) {
     console.error('加载图片失败:', error)
-  } finally {
     isloading.value = false
   }
 }
+
+// 在组件被激活时（keep-alive 恢复）重新初始化 DOM 相关行为
+onActivated(() => {
+  nextTick(() => {
+    try {
+      // 恢复目录状态（如果需要）
+      if (props.isExpandDirectory !== undefined) {
+        toggleDirectoryStatus(props.isExpandDirectory)
+      }
+
+      // 重新初始化图片的 panzoom（因为 keep-alive 恢复后 DOM 需要重新绑定）
+      if (isImageType.value && imageUrl.value) {
+        // 延迟一点等待 DOM 完全恢复
+        const _reactivateTid = setTimeout(() => {
+          initPanzoomForImage()
+        }, 100)
+        pendingTimeouts.push(_reactivateTid)
+      }
+    } catch (e) {
+      console.error('onActivated 恢复失败', e)
+    }
+  })
+})
+
+// 在组件停用或卸载时清理定时器和事件，防止累积导致卡死
+const clearAllTimeouts = () => {
+  while (pendingTimeouts.length) {
+    const id = pendingTimeouts.pop()
+    clearTimeout(id)
+  }
+}
+
+const destroyPanzoom = () => {
+  try {
+    const imgEl = document.querySelector('#panzoomImg')
+    if (imgEl && wheelHandler.value) {
+      imgEl.parentElement.removeEventListener('wheel', wheelHandler.value)
+      wheelHandler.value = null
+    }
+  } catch {
+    // ignore
+  }
+  if (panzoomInstance.value) {
+    try {
+      panzoomInstance.value.destroy()
+    } catch {
+      // ignore
+    }
+    panzoomInstance.value = null
+  }
+}
+
+onDeactivated(() => {
+  clearAllTimeouts()
+  destroyPanzoom()
+})
+
+onBeforeUnmount(() => {
+  clearAllTimeouts()
+  destroyPanzoom()
+})
 
 const pdfUrl = ref('')
 const loadPdfFile = () => {
@@ -219,13 +316,46 @@ const loadPdfFile = () => {
 }
 
 onMounted(() => {
+  // 初始化文件类型
+  if (props.fileType) {
+    const typeStr = props.fileType
+    getFileType.value = typeStr.includes('/')
+      ? typeStr.split('/')[1]
+      : typeStr
+    isImageType.value = imageTypes.includes(getFileType.value.toLowerCase())
+  }
+
   // 如果有传入的文件名，使用传入的；否则使用默认的
   if (props.fileName) {
-    console.log('bbb' + getFileType.value)
+    console.log('初始化文件:', props.fileName, '类型:', getFileType.value)
     getFileName.value = props.fileName
-    getFileType.value = props.fileType
+
+    // 根据文件类型加载对应内容
+    if (
+      getFileType.value === 'octet-stream' ||
+      getFileType.value === 'markdown'
+    ) {
+      loadMarkdownFile()
+    } else if (getFileType.value === 'pdf') {
+      loadPdfFile()
+      const _pdfTid = setTimeout(() => {
+        toggleDirectoryStatus(false)
+      }, 200)
+      pendingTimeouts.push(_pdfTid)
+    } else if (isImageType.value) {
+      loadImageFile()
+      const _imgTid = setTimeout(() => {
+        toggleDirectoryStatus(false)
+      }, 200)
+      pendingTimeouts.push(_imgTid)
+    } else {
+      // 默认加载 markdown
+      loadMarkdownFile()
+    }
+  } else {
+    // 没有文件名时加载默认 markdown
+    loadMarkdownFile()
   }
-  loadMarkdownFile()
 
   // 确保目录初始状态正确
   nextTick(() => {
@@ -300,18 +430,20 @@ watch(
     // 如果当前文件是 PDF，强制不显示目录
     if (props.fileType && props.fileType.includes('pdf')) {
       console.log('PDF文件，强制关闭目录')
-      setTimeout(() => {
+      const _pdfTid2 = setTimeout(() => {
         console.log('执行 toggleDirectoryStatus(false)')
         toggleDirectoryStatus(false)
       }, 100)
+      pendingTimeouts.push(_pdfTid2)
       return
     }
 
     // 使用 setTimeout 确保 DOM 完全渲染
-    setTimeout(() => {
+    const _tid = setTimeout(() => {
       console.log('执行 toggleDirectoryStatus(' + newValue + ')')
       toggleDirectoryStatus(newValue)
     }, 100)
+    pendingTimeouts.push(_tid)
   },
   { immediate: true }
 )
