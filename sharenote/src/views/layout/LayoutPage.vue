@@ -34,6 +34,8 @@ const menuSearchUpload = ref(null)
 
 // 抽屉是否显示
 const isExpand = ref(true)
+// 抽屉是否被禁用（在设置和个人简介页面时禁用）
+const isMenuDisabled = ref(false)
 // btn是否点击
 const isActivedClick = ref('Home')
 // 小组成员avatar是否选择
@@ -43,6 +45,11 @@ const isActivedChoice = ref(true)
 
 // 折叠还是收起列表栏
 const toggleFoldStatus = () => {
+  // 如果菜单被禁用，不执行任何操作
+  if (isMenuDisabled.value) {
+    return
+  }
+
   if (isExpand.value) {
     // 如果此时状态是展开的--点击则是要收缩
     menu.value.style.width = '0px'
@@ -63,18 +70,42 @@ const isExpandDirectory = ref(true)
 // 跳转到首页
 const goHomePage = () => {
   isActivedClick.value = 'Home'
+  // 恢复菜单功能
+  isMenuDisabled.value = false
+  // 如果菜单是收起状态，展开它
+  if (!isExpand.value) {
+    toggleFoldStatus()
+  }
   router.push('/')
 }
 
 // 跳转到设置页
 const goSettingsPage = () => {
   isActivedClick.value = 'Settings'
+  // 禁用菜单展开功能
+  isMenuDisabled.value = true
+  // 收起菜单
+  if (isExpand.value) {
+    menu.value.style.width = '0px'
+    menuSearchUpload.value.style.display = 'none'
+    menu.value.style.borderRight = 'none'
+    isExpand.value = false
+  }
   router.push('/main/settings')
 }
 
 // 跳转到个人简介页
 const goProfilesPage = () => {
   isActivedClick.value = 'Profile'
+  // 禁用菜单展开功能
+  isMenuDisabled.value = true
+  // 收起菜单
+  if (isExpand.value) {
+    menu.value.style.width = '0px'
+    menuSearchUpload.value.style.display = 'none'
+    menu.value.style.borderRight = 'none'
+    isExpand.value = false
+  }
   router.push('/main/profile')
 }
 
@@ -258,7 +289,7 @@ const deleteFile = async () => {
         <div class="btn">
           <div
             class="btn-base btn-flod"
-            :class="{ isClicked: true }"
+            :class="{ isClicked: true, disabled: isMenuDisabled }"
             @click="toggleFoldStatus"
           >
             <el-icon v-if="isExpand === true"><Expand /></el-icon>
@@ -576,6 +607,12 @@ const deleteFile = async () => {
           color: rgb(3, 6, 23);
           background-color: rgb(51, 196, 144);
           box-shadow: 0 0 35px -5px rgba(51, 196, 144, 0.5);
+        }
+
+        .disabled {
+          opacity: 0.3;
+          cursor: not-allowed;
+          pointer-events: none;
         }
       }
 
