@@ -137,6 +137,13 @@ const getUserNotesList = async () => {
 }
 getUserNotesList()
 
+// 文件上传完成后的处理函数
+const handleUploadComplete = async () => {
+  console.log('开始刷新笔记列表...')
+  await getUserNotesList()
+  console.log('笔记列表已更新')
+}
+
 // 监听路由变化，自动恢复对应页面的菜单状态（不用 immediate，以避免 DOM 未挂载时的问题）
 watch(
   () => route.path,
@@ -620,7 +627,10 @@ const deleteFile = async () => {
       </div>
     </div>
     <!--加入分组 -->
-    <AddNotes ref="AddNotesRef"></AddNotes>
+    <AddNotes
+      ref="AddNotesRef"
+      @upload-complete="handleUploadComplete"
+    ></AddNotes>
 
     <!-- 切换分组 -->
     <ChangeGroup ref="ChangeGroupRef"></ChangeGroup>

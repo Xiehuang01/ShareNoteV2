@@ -5,6 +5,8 @@ import { baseURL } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 // import { ElMessageBox } from 'element-plus'
 
+const emit = defineEmits(['upload-complete'])
+
 const mask = ref(null)
 const addNote = ref(null)
 const uploadFileRef = ref(null)
@@ -18,12 +20,17 @@ const formModel = ref({
   filename: '',
   file: null
 })
+const uploadSuccessCount = ref(0) // 上传成功的文件数
+const totalFilesToUpload = ref(0) // 需要上传的总文件数
+
 const clearFormModelcache = () => {
   formModel.value = {
     filename: '',
     file: null
   }
   confirmMarkdownUpload.value = false
+  uploadSuccessCount.value = 0
+  totalFilesToUpload.value = 0
 }
 
 const rules = {
@@ -126,6 +133,26 @@ const validateFiles = async (isForce) => {
     return true
   }
 }
+// 文件上传成功的回调
+const handleUploadSuccess = (response, file, fileList) => {
+  console.log('文件上传成功:', file.name)
+  uploadSuccessCount.value++
+
+  // 当所有文件都上传成功后，发送完成事件
+  if (uploadSuccessCount.value === totalFilesToUpload.value) {
+    ElMessage.success('所有文件上传成功')
+    confirmMarkdownUpload.value = false
+    turnoffAddNote()
+    emit('upload-complete') // 发送上传完成事件
+  }
+}
+
+// 文件上传失败的回调
+const handleUploadError = (error, file, fileList) => {
+  console.error('文件上传失败:', file.name, error)
+  ElMessage.error(`文件 ${file.name} 上传失败`)
+}
+
 // 上传确认上传
 const uploadClicked = async (ifForce) => {
   // 文件名表单校验
@@ -136,10 +163,11 @@ const uploadClicked = async (ifForce) => {
   const validateFilesRes = await validateFiles(ifForce)
   console.log(validateFilesRes)
   if (validateFilesRes) {
+    // 重置计数器
+    uploadSuccessCount.value = 0
+    totalFilesToUpload.value = uploadFilesList.value.length
+    console.log('开始上传，总文件数:', totalFilesToUpload.value)
     uploadFileRef.value.submit()
-    ElMessage.success('文件上传成功')
-    confirmMarkdownUpload.value = false // 上传按钮恢复样式
-    turnoffAddNote() // 关闭窗口
   } else console.log('上传错误:', validateFilesRes)
 }
 
@@ -177,6 +205,8 @@ defineExpose({
         v-model:file-list="uploadFilesList"
         accept=".md, .pdf, .png, .jpg, jpeg"
         :before-upload="beforeUploadFiles"
+        @success="handleUploadSuccess"
+        @error="handleUploadError"
       >
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">

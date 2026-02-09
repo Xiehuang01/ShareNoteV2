@@ -319,9 +319,7 @@ onMounted(() => {
   // 初始化文件类型
   if (props.fileType) {
     const typeStr = props.fileType
-    getFileType.value = typeStr.includes('/')
-      ? typeStr.split('/')[1]
-      : typeStr
+    getFileType.value = typeStr.includes('/') ? typeStr.split('/')[1] : typeStr
     isImageType.value = imageTypes.includes(getFileType.value.toLowerCase())
   }
 
@@ -496,14 +494,18 @@ watch(
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        width: 100%;
       "
       v-loading="isloading"
     >
-      <el-icon :size="50" color="rgba(31, 32, 34, 0.5)"><Management /></el-icon>
+      <!-- <el-icon :size="50" color="rgba(31, 32, 34, 0.5)"><Management /></el-icon>
       <p style="margin: 0; padding: 0; color: rgba(31, 32, 34, 0.5)">
         空空如也~
       </p>
-      <p style="color: rgba(31, 32, 34, 0.5)">快去上传内容吧</p>
+      <p style="color: rgba(31, 32, 34, 0.5)">快去上传内容吧</p> -->
+      <div class="empty-state">
+        <el-empty description="空空如也~ 快去上传笔记吧" />
+      </div>
     </div>
     <!-- 目录 -->
     <div class="directory" ref="directoryRef">
