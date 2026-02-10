@@ -18,3 +18,7 @@ export const userChangePasswordServer = ({ email, password }) =>
 
 // 获取用户信息
 export const userGetUserInfoServer = () => request.get('/getUserInfo')
+
+// 更新用户信息
+export const userUpdateUserInfoServer = ({ username, email }) =>
+  request.post('/updateUserInfo', { username, email })

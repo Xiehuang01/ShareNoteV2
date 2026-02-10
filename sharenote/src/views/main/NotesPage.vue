@@ -11,7 +11,7 @@ import {
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css' // 高亮主题
-import { Management } from '@element-plus/icons-vue'
+// import { Management } from '@element-plus/icons-vue'
 import { baseURL } from '@/utils/request'
 import Panzoom from '@panzoom/panzoom'
 import VuePdfEmbed from 'vue-pdf-embed'

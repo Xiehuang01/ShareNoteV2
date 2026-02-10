@@ -13,12 +13,16 @@ import {
   Avatar
 } from '@element-plus/icons-vue'
 import { baseURL } from '@/utils/request'
+import { userUpdateUserInfoServer, userGetUserInfoServer } from '@/api/user'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
 
 const userStore = useUserStore()
 const router = useRouter()
 
 // 编辑模式
 const isEditing = ref(false)
+// 保存时 loading
+const isSaving = ref(false)
 const editForm = ref({
   username: userStore.userInfo.username || '',
   email: userStore.userInfo.userEmail || ''
@@ -69,12 +73,41 @@ const startEditing = () => {
 }
 
 // 保存编辑
-const saveEdit = () => {
-  // 这里可以添加保存到服务器的逻辑
-  userStore.userInfo.username = editForm.value.username
-  userStore.userInfo.userEmail = editForm.value.email
-  isEditing.value = false
-  ElMessage.success('个人信息更新成功')
+const saveEdit = async () => {
+  isSaving.value = true
+  try {
+    const payload = {
+      username: editForm.value.username,
+      email: editForm.value.email
+    }
+    const res = await userUpdateUserInfoServer(payload)
+    if (res && res.status === 'success') {
+      // 后端只返回成功消息（不返回 data）的情况：去后端拉取最新用户信息
+      try {
+        const info = await userGetUserInfoServer()
+        if (info && info.status === 'success' && info.data) {
+          userStore.userInfo.username = info.data.username
+          userStore.userInfo.userEmail = info.data.email
+          userStore.userInfo.useravatarPath = info.data.avatarpath
+        }
+      } catch (err) {
+        // 若拉取失败，也兜底使用表单值
+        console.error('refresh user info error', err)
+        userStore.userInfo.username = editForm.value.username
+        userStore.userInfo.userEmail = editForm.value.email
+      }
+
+      isEditing.value = false
+      ElMessage.success(res.message || '个人信息更新成功')
+    } else {
+      ElMessage.error(res?.message || '更新失败')
+    }
+  } catch (err) {
+    console.error('saveEdit error', err)
+    ElMessage.error('保存个人信息时发生错误')
+  } finally {
+    isSaving.value = false
+  }
 }
 
 // 取消编辑
@@ -111,6 +144,11 @@ const getAvatarUrl = () => {
 const changePassword = () => {
   router.push('/forgetpassword')
 }
+
+// 修改头像
+const editAvatar = () => {
+  ElMessage.info('头像修改功能正在开发中，敬请期待！')
+}
 </script>
 
 <template>
@@ -120,9 +158,9 @@ const changePassword = () => {
       <div class="avatar-card">
         <div class="avatar-wrapper">
           <img :src="getAvatarUrl()" alt="用户头像" class="avatar-img" />
-          <div class="avatar-overlay" @click="startEditing">
+          <div class="avatar-overlay" @click="editAvatar">
             <el-icon><EditPen /></el-icon>
-            <span>修改资料</span>
+            <span>修改头像</span>
           </div>
         </div>
         <h2 class="username">{{ userStore.userInfo.username || '用户' }}</h2>
@@ -169,9 +207,15 @@ const changePassword = () => {
             编辑
           </el-button>
           <div v-else class="edit-actions">
-            <el-button class="btn-save" size="small" @click="saveEdit"
-              >保存</el-button
+            <el-button
+              class="btn-save"
+              size="small"
+              :disabled="isSaving"
+              @click="saveEdit"
             >
+              保存
+            </el-button>
+
             <el-button class="btn-cancel" size="small" @click="cancelEdit"
               >取消</el-button
             >
@@ -201,6 +245,7 @@ const changePassword = () => {
               <el-input
                 v-model="editForm.username"
                 placeholder="请输入用户名"
+                :disabled="isSaving"
               />
             </el-form-item>
             <el-form-item label="邮箱">
@@ -208,6 +253,8 @@ const changePassword = () => {
             </el-form-item>
           </el-form>
         </div>
+        <!-- 保存时覆盖层（复用组件） -->
+        <LoadingOverlay v-if="isSaving" />
       </div>
 
       <!-- 统计信息卡片 -->
@@ -548,6 +595,8 @@ const changePassword = () => {
     }
   }
 }
+
+/* 使用公用组件 LoadingOverlay 替代内联样式 */
 
 .stats-card {
   background-color: rgb(8, 15, 32);

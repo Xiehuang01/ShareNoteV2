@@ -4,6 +4,7 @@ import { UploadFilled, Upload, Delete } from '@element-plus/icons-vue'
 import { baseURL } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 // import { ElMessageBox } from 'element-plus'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
 
 const emit = defineEmits(['upload-complete'])
 
@@ -15,6 +16,7 @@ const uploadFilesList = ref([])
 const confirmMarkdownUpload = ref(false)
 const confirmMarkdownUploadRef = ref(false)
 const userStore = useUserStore()
+const uploadloading = ref(false) // 加载状态
 
 const formModel = ref({
   filename: '',
@@ -54,6 +56,7 @@ const turnoffAddNote = () => {
   form.value.resetFields() // 清空表单
   addNote.value.style.display = 'none'
   mask.value.style.display = 'none'
+  uploadloading.value = false
 }
 // 开启添加笔记
 const turnonAddNote = () => {
@@ -70,6 +73,7 @@ const beforeUploadFiles = (file) => {
 const validateFiles = async (isForce) => {
   // 判断用户是否上传了文件
   if (uploadFilesList.value.length === 0) {
+    uploadloading.value = false
     ElMessage.error('没有上传文件')
     return false
   }
@@ -92,23 +96,27 @@ const validateFiles = async (isForce) => {
   // 判断上传的Markdown文件是否超出数量
   if (AllMarkdownFiles.length > 1) {
     ElMessage.error('只能上传一个Markdown文件')
+    uploadloading.value = false
     return false
   }
   // 判断上传的Markdown文件是否超出数量
   if (AllPdfFiles.length > 1) {
     ElMessage.error('只能上传一个pdf文件')
+    uploadloading.value = false
     return false
   }
   // 上传了Markdown文件不能上传pdf文件
   if (AllMarkdownFiles.length === 1) {
     if (AllPdfFiles.length !== 0) {
       ElMessage.warning('MarkDown文件和pdf文件不能同时上传')
+      uploadloading.value = false
       return false
     }
     // 用户没有上传图片时
     if (AllPicFiles.length === 0) {
       if (isForce === 'noForce') {
         confirmMarkdownUpload.value = !confirmMarkdownUpload.value
+        uploadloading.value = false
         return false
         // 这是confirmMarkdownUploadBtn会显示出来，就等待uploadClicked('force')的时候显示
       }
@@ -122,20 +130,23 @@ const validateFiles = async (isForce) => {
     // 用户上传了pdf以外的文件
     if (uploadFilesList.value.length !== 1) {
       ElMessage.warning('pdf文件不能与其他文件同时上传')
+      uploadloading.value = false
       return false
     }
     // 用户只上传了pdf文件
     return true
   } else if (AllPicFiles.length !== 1) {
     ElMessage.warning('暂不支持上传图集')
+    uploadloading.value = false
     return false
   } else {
     return true
   }
 }
+
 // 文件上传成功的回调
 const handleUploadSuccess = (response, file, fileList) => {
-  console.log('文件上传成功:', file.name)
+  console.log('文件上传成功:', file.name, fileList)
   uploadSuccessCount.value++
 
   // 当所有文件都上传成功后，发送完成事件
@@ -149,14 +160,23 @@ const handleUploadSuccess = (response, file, fileList) => {
 
 // 文件上传失败的回调
 const handleUploadError = (error, file, fileList) => {
-  console.error('文件上传失败:', file.name, error)
+  uploadloading.value = false
+  console.error('文件上传失败:', file.name, error, fileList)
   ElMessage.error(`文件 ${file.name} 上传失败`)
 }
 
 // 上传确认上传
 const uploadClicked = async (ifForce) => {
+  uploadloading.value = true
   // 文件名表单校验
-  await form.value.validate()
+  try {
+    await form.value.validate()
+  } catch (err) {
+    console.error('表单校验失败:', err)
+    // 校验失败，不继续上传，也不关闭弹窗
+    uploadloading.value = false
+    return
+  }
   // 打印已经上传的文件
   console.log(uploadFilesList.value)
   // 文件上传校验
@@ -291,6 +311,9 @@ defineExpose({
 
   <!-- 遮罩 -->
   <div id="mask-dialog" ref="mask" @click="turnoffAddNote"></div>
+
+  <!-- 加载中遮罩 -->
+  <LoadingOverlay v-if="uploadloading" />
 </template>
 
 <!-- 窗口2--切换分组 -->
