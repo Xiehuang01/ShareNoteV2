@@ -24,6 +24,9 @@ import {
   Edit,
   Memo
 } from '@element-plus/icons-vue'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
+const uploadloading = ref(false)
+
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
@@ -327,11 +330,12 @@ const deleteFile = async () => {
         type: 'warning'
       }
     )
-
+    uploadloading.value = true
     // 调用删除 API
     const res = await filesDeleteNoteServer(clickNotesActivedId.value)
 
     if (res && res.status === 'success') {
+      uploadloading.value = false
       ElMessage.success('笔记删除成功')
 
       // 清空当前选中的笔记信息
@@ -351,6 +355,7 @@ const deleteFile = async () => {
       ElMessage.error('删除笔记失败，请重试')
     }
   } catch (error) {
+    uploadloading.value = false
     // 用户点击了取消按钮
     if (error === 'cancel') {
       return
@@ -635,6 +640,8 @@ const deleteFile = async () => {
     <!-- 切换分组 -->
     <ChangeGroup ref="ChangeGroupRef"></ChangeGroup>
   </div>
+
+  <LoadingOverlay v-if="uploadloading" />
 </template>
 
 <!-- 主要页面的导航栏和抽屉 -->
