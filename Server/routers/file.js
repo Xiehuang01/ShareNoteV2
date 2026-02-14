@@ -198,5 +198,40 @@ router.delete('/deleteFile/:fileId', checkAuth, async (req, res) => {
     }
 })
 
+// 更新文件内容接口
+router.post('/updateFile', checkAuth, async (req, res) => {
+  const { fileName, content } = req.body
+  const userId = req.userId
+
+  if (!fileName || content === undefined) {
+    return res.status(400).json({ status: 'fail', message: '缺少文件名或内容参数' })
+  }
+
+  try {
+    // 先验证文件属于当前用户
+    const [fileRows] = await pool.execute(
+      'SELECT * FROM files WHERE fileName = ? AND publisherId = ?',
+      [fileName, userId]
+    )
+
+    if (fileRows.length === 0) {
+      return res.status(404).json({ status: 'fail', message: '文件不存在或无权限修改' })
+    }
+
+    const filePath = path.join(uploadPath, fileName)
+
+    // 写入新内容到文件
+    fs.writeFileSync(filePath, content, 'utf8')
+
+    res.json({
+      status: 'success',
+      message: '文件更新成功'
+    })
+  } catch (err) {
+    console.error('更新文件错误:', err)
+    res.status(500).json({ status: 'fail', message: '服务器错误' })
+  }
+})
+
 // 导出路由
 export default router

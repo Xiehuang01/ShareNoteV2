@@ -81,6 +81,19 @@ export const useUserStore = defineStore(
       chooseNote.value = null
     }
 
+    // 编辑模式状态（不持久化，每次刷新页面重置）
+    const isEditMode = ref(false)
+
+    // 切换编辑模式
+    const toggleEditMode = () => {
+      isEditMode.value = !isEditMode.value
+    }
+
+    // 设置编辑模式
+    const setEditMode = (mode) => {
+      isEditMode.value = mode
+    }
+
     return {
       token,
       setToken,
@@ -94,10 +107,17 @@ export const useUserStore = defineStore(
       clearSelectedNote,
       chooseNote,
       setChooseNote,
-      removetChooseNote
+      removetChooseNote,
+      isEditMode,
+      toggleEditMode,
+      setEditMode
     }
   },
   {
-    persist: true
+    persist: {
+      key: 'sharenote-user',
+      storage: localStorage,
+      paths: ['token', 'userInfo', 'userNotesList', 'selectedNote', 'chooseNote']
+    }
   }
 )

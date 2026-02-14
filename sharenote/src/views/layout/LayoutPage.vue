@@ -35,6 +35,7 @@ const ChangeGroupRef = ref(null)
 const AddNotesRef = ref(null)
 const menu = ref(null)
 const menuSearchUpload = ref(null)
+const notesPageRef = ref(null)
 
 // 抽屉是否显示
 const isExpand = ref(true)
@@ -256,6 +257,28 @@ const isMarkdownFile = (fileType) => {
 // 按钮禁用状态
 const isEditDisabled = ref(false)
 const isDirectoryDisabled = ref(false)
+
+// 处理编辑按钮点击
+const handleEditClick = () => {
+  // 检查是否有选中的笔记
+  if (!clickNotesActivedId.value) {
+    ElMessage.warning('请先选中一个笔记')
+    return
+  }
+  // 检查是否为 Markdown 文件
+  const isMarkdown = isMarkdownFile(selectedFileType.value)
+  if (!isMarkdown) {
+    ElMessage.warning('只有 Markdown 文件支持编辑')
+    return
+  }
+  // 使用 store 切换编辑模式
+  userStore.toggleEditMode()
+}
+
+// 处理编辑模式变化
+const handleToggleEdit = (editing) => {
+  userStore.setEditMode(editing)
+}
 
 // 搜索输入框
 const input2 = ref('')
@@ -586,6 +609,7 @@ const deleteFile = async () => {
               class="btn-edit"
               circle
               :disabled="isEditDisabled"
+              @click="handleEditClick"
               style="
                 width: 40px;
                 background-color: rgba(77, 170, 253, 0.2);
@@ -621,12 +645,14 @@ const deleteFile = async () => {
       <!-- 二级路由 -->
       <div class="router2">
         <!-- 二级路由出口 -->
-        <keep-alive :include="['NotesPage']">
+        <keep-alive>
           <router-view
+            ref="notesPageRef"
             class="routerView"
             :isExpandDirectory="isExpandDirectory"
             :fileName="selectedFileName"
             :fileType="selectedFileType"
+            @toggle-edit="handleToggleEdit"
           ></router-view>
         </keep-alive>
       </div>

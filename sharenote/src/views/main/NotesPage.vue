@@ -1,4 +1,9 @@
 <script setup>
+// 定义组件名称，供 keep-alive 使用
+defineOptions({
+  name: 'NotesPage'
+})
+
 import {
   ref,
   onMounted,
@@ -11,10 +16,14 @@ import {
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css' // 高亮主题
+import { ElMessage } from 'element-plus'
 // import { Management } from '@element-plus/icons-vue'
 import { baseURL } from '@/utils/request'
+import { filesUpdateFileServer } from '@/api/files'
 import Panzoom from '@panzoom/panzoom'
 import VuePdfEmbed from 'vue-pdf-embed'
+import { useUserStore } from '@/stores/user'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
 
 // 接收父组件传递的 props
 const props = defineProps({
@@ -32,9 +41,12 @@ const props = defineProps({
   }
 })
 
-// const emit = defineEmits(['disabledDirectory'])
+const userStore = useUserStore()
 
 const isloading = ref(null)
+const updateLoading = ref(false)
+const markdownText = ref('') // 编辑器中的文本
+const isSaving = ref(false) // 保存状态
 
 const isImageType = ref(false)
 
@@ -48,6 +60,98 @@ const toc = ref([]) // 目录
 const getFileName = ref(props.fileName || 'welcome.md')
 const getFileType = ref(props.fileType.split('/')[1])
 let headingCount = 0
+
+// 编辑器输入时更新 markdown 文本并实时预览
+const handleEditorInput = (value) => {
+  markdownText.value = value
+  // 如果不是保存状态，实时更新预览
+  if (!isSaving.value) {
+    updatePreview(value)
+  }
+}
+
+// 更新预览
+const updatePreview = (text) => {
+  try {
+    // 清空目录数组，重置计数器
+    toc.value = []
+    headingCount = 0
+
+    // 1. 用 lexer 拿到 token 列表
+    const tokens = marked.lexer(text)
+
+    // 2. 遍历 tokens，生成 HTML
+    const htmlArr = tokens.map((token) => {
+      if (token.type === 'heading') {
+        const id = `heading-${headingCount++}`
+        toc.value.push({
+          level: token.depth,
+          text: token.text,
+          id
+        })
+        return `<h${token.depth} id="${id}">${token.text}</h${token.depth}>`
+      } else {
+        // 其他 token 用 parser 渲染
+        return marked.parser([token])
+      }
+    })
+
+    html.value = htmlArr.join('')
+
+    // 3. 高亮代码块
+    nextTick(() => {
+      document.querySelectorAll('.markdown-body pre code').forEach((block) => {
+        block.classList.add('hljs')
+        hljs.highlightElement(block)
+      })
+    })
+  } catch (error) {
+    console.error('预览更新失败:', error)
+  }
+}
+
+// 保存编辑后的内容
+const saveEdit = async () => {
+  updateLoading.value = true
+  if (!markdownText.value) {
+    updateLoading.value = false
+    ElMessage.warning('没有内容可保存')
+    return
+  }
+
+  try {
+    isSaving.value = true
+    const res = await filesUpdateFileServer({
+      fileName: getFileName.value,
+      content: markdownText.value
+    })
+
+    if (res.status === 'success') {
+      updateLoading.value = false
+      ElMessage.success('保存成功')
+      // 退出编辑模式
+      userStore.setEditMode(false)
+      // 重新加载文件
+      await loadMarkdownFile()
+    } else {
+      ElMessage.error(res.message || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存失败:', error)
+    ElMessage.error(
+      error.response?.data?.message || '保存失败，请检查服务器连接'
+    )
+  } finally {
+    isSaving.value = false
+  }
+}
+
+// 取消编辑
+const cancelEdit = () => {
+  userStore.setEditMode(false)
+  // 恢复原始内容
+  loadMarkdownFile()
+}
 // 用于保存所有创建的定时器 id，便于在停用/卸载时清理
 const pendingTimeouts = []
 
@@ -60,6 +164,11 @@ const pendingTimeouts = []
 watch(
   [() => props.fileName, () => props.fileType],
   ([newFileName, newFileType]) => {
+    // 文件切换时自动退出编辑模式
+    if (userStore.isEditMode) {
+      userStore.setEditMode(false)
+    }
+
     if (newFileName) {
       getFileName.value = newFileName
       // 处理 fileType，可能是 'image/png' 格式或直接的 'png' 格式
@@ -133,14 +242,17 @@ const loadMarkdownFile = async () => {
       throw new Error(`HTTP error! status: ${res.status}`)
     }
 
-    const markdownText = await res.text()
+    const text = await res.text()
+
+    // 保存原始 Markdown 文本到编辑器
+    markdownText.value = text
 
     // 清空目录数组，重置计数器
     toc.value = []
     headingCount = 0
 
     // 1. 用 lexer 拿到 token 列表
-    const tokens = marked.lexer(markdownText)
+    const tokens = marked.lexer(text)
 
     // 2. 遍历 tokens，生成 HTML
     const htmlArr = tokens.map((token) => {
@@ -418,6 +530,12 @@ const toggleDirectoryStatus = (isExpandValue) => {
   console.log('内容区宽度设置为:', markdownBodyRef.value.style.width)
 }
 
+// 暴露方法给父组件
+defineExpose({
+  saveEdit,
+  cancelEdit
+})
+
 // 监听isExpandDirectory的变化
 watch(
   () => props.isExpandDirectory,
@@ -449,11 +567,63 @@ watch(
 
 <template>
   <div class="wrapper">
-    <!-- Markdown主内容 -->
+    <!-- 编辑模式：编辑器 + 预览 -->
     <div
+      v-if="
+        userStore.isEditMode &&
+        (getFileType === 'octet-stream' || getFileType === 'markdown')
+      "
+      class="editor-container"
+    >
+      <!-- 左侧编辑器 -->
+      <div class="editor-pane">
+        <div class="editor-toolbar">
+          <span class="editor-title">编辑模式</span>
+          <div class="editor-actions">
+            <el-button
+              class="btn-cancel"
+              size="small"
+              @click="cancelEdit"
+              :disabled="isSaving"
+              >取消</el-button
+            >
+            <el-button
+              class="btn-save"
+              type="primary"
+              size="small"
+              @click="saveEdit"
+              :loading="isSaving"
+              >保存</el-button
+            >
+          </div>
+        </div>
+        <textarea
+          v-model="markdownText"
+          @input="handleEditorInput(markdownText)"
+          class="markdown-editor"
+          placeholder="在此输入 Markdown 内容..."
+          spellcheck="false"
+        ></textarea>
+      </div>
+      <!-- 右侧预览 -->
+      <div class="preview-pane">
+        <div class="preview-header">预览</div>
+        <div
+          class="markdown-body preview-content"
+          v-html="html"
+          ref="markdownBodyRef"
+        ></div>
+      </div>
+    </div>
+
+    <!-- 预览模式：Markdown主内容 -->
+    <div
+      v-else-if="
+        html !== null &&
+        (getFileType === 'octet-stream' || getFileType === 'markdown')
+      "
       class="markdown-body"
       v-html="html"
-      v-if="html !== null"
       ref="markdownBodyRef"
       v-loading="isloading"
     ></div>
@@ -508,7 +678,7 @@ watch(
       </div>
     </div>
     <!-- 目录 -->
-    <div class="directory" ref="directoryRef">
+    <div v-if="!userStore.isEditMode" class="directory" ref="directoryRef">
       <ul v-if="toc.length > 0">
         <!-- 遍历 toc 中的每一项 -->
         <li
@@ -533,10 +703,13 @@ watch(
       </p>
     </div>
   </div>
+
+  <LoadingOverlay v-if="updateLoading" />
 </template>
 
 <style lang="scss" scoped>
 @import 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css';
+
 .wrapper {
   color: white;
   height: 100%;
@@ -549,6 +722,120 @@ watch(
   background: rgb(255, 255, 255);
   // background-color: pink;
   flex-grow: 0;
+
+  // 编辑器容器
+  .editor-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    background: rgb(255, 255, 255);
+
+    .editor-pane {
+      width: 50%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid rgb(215, 221, 227);
+
+      .editor-toolbar {
+        height: 50px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        border-bottom: 1px solid rgb(215, 221, 227);
+        background: rgb(246, 248, 250);
+
+        .editor-title {
+          font-weight: bold;
+          color: rgb(31, 32, 34);
+          font-size: 16px;
+        }
+
+        .editor-actions {
+          display: flex;
+          gap: 10px;
+
+          .btn-cancel {
+            background-color: transparent;
+            border: 1px solid rgb(255, 14, 35);
+            color: rgb(255, 14, 35);
+            transition: all 0.3s;
+
+            &:hover {
+              background-color: rgb(255, 14, 35);
+              color: rgb(3, 6, 23);
+            }
+
+            &:disabled {
+              opacity: 0.5;
+              background-color: transparent;
+              color: rgb(255, 14, 35);
+              cursor: not-allowed;
+            }
+          }
+
+          .btn-save {
+            background-color: rgba(22, 187, 130, 0.2);
+            border: 1px solid rgb(22, 187, 130);
+            color: rgb(22, 187, 130);
+            transition: all 0.3s;
+
+            &:hover {
+              background-color: rgb(22, 187, 130);
+              color: rgb(3, 6, 23);
+            }
+
+            &.is-loading {
+              opacity: 0.7;
+            }
+          }
+        }
+      }
+
+      .markdown-editor {
+        flex: 1;
+        width: 100%;
+        padding: 20px;
+        border: none;
+        outline: none;
+        resize: none;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        color: rgb(31, 32, 34);
+        background: rgb(255, 255, 255);
+        box-sizing: border-box;
+      }
+    }
+
+    .preview-pane {
+      width: 50%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+
+      .preview-header {
+        height: 50px;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        border-bottom: 1px solid rgb(215, 221, 227);
+        background: rgb(246, 248, 250);
+        font-weight: bold;
+        color: rgb(31, 32, 34);
+        font-size: 16px;
+      }
+
+      .preview-content {
+        flex: 1;
+        width: 100%;
+        padding: 20px;
+        overflow-y: auto;
+      }
+    }
+  }
+
   .markdown-body {
     height: 100%;
     width: 70%; /* 与 JavaScript 中的 70% 保持一致 */
