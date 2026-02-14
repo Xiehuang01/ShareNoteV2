@@ -10,11 +10,14 @@ import {
   Document,
   SwitchButton,
   EditPen,
-  Avatar
+  Avatar,
+  Upload,
+  Loading
 } from '@element-plus/icons-vue'
 import { baseURL } from '@/utils/request'
-import { userUpdateUserInfoServer, userGetUserInfoServer } from '@/api/user'
+import { userUpdateUserInfoServer, userGetUserInfoServer, userUploadAvatarServer } from '@/api/user'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
+import AvatarCropDialog from '@/components/AvatarCropDialog.vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -23,6 +26,8 @@ const router = useRouter()
 const isEditing = ref(false)
 // 保存时 loading
 const isSaving = ref(false)
+// 头像上传 loading
+const isUploadingAvatar = ref(false)
 const editForm = ref({
   username: userStore.userInfo.username || '',
   email: userStore.userInfo.userEmail || ''
@@ -146,21 +151,108 @@ const changePassword = () => {
 }
 
 // 修改头像
+const avatarInputRef = ref(null)
+const showAvatarDialog = ref(false)
+const previewImageUrl = ref('')
+const selectedFile = ref(null)
+
 const editAvatar = () => {
-  ElMessage.info('头像修改功能正在开发中，敬请期待！')
+  // 触发文件选择
+  avatarInputRef.value?.click()
+}
+
+// 处理头像文件选择
+const handleAvatarChange = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  // 验证文件类型
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    ElMessage.error('只支持 JPG、PNG、GIF、WEBP 格式的图片')
+    return
+  }
+
+  // 验证文件大小（10MB）
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过 10MB')
+    return
+  }
+
+  // 保存文件并显示预览对话框
+  selectedFile.value = file
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    previewImageUrl.value = e.target.result
+    showAvatarDialog.value = true
+  }
+  reader.readAsDataURL(file)
+
+  // 清空 input，允许重复选择同一文件
+  if (avatarInputRef.value) {
+    avatarInputRef.value.value = ''
+  }
+}
+
+// 取消上传
+const cancelUpload = () => {
+  showAvatarDialog.value = false
+  previewImageUrl.value = ''
+  selectedFile.value = null
+}
+
+// 确认上传
+const confirmUpload = async ({ getCroppedImage }) => {
+  isUploadingAvatar.value = true
+  try {
+    // 获取裁剪后的图片 Blob
+    const croppedBlob = await getCroppedImage()
+    
+    // 创建 FormData 并添加裁剪后的图片
+    const formData = new FormData()
+    formData.append('avatar', croppedBlob, 'avatar.png')
+
+    const res = await userUploadAvatarServer(formData)
+    
+    if (res && res.status === 'success') {
+      // 更新 store 中的头像路径
+      userStore.userInfo.useravatarPath = res.data.avatarPath
+      ElMessage.success('头像上传成功')
+      showAvatarDialog.value = false
+      previewImageUrl.value = ''
+      selectedFile.value = null
+    } else {
+      ElMessage.error(res?.message || '头像上传失败')
+    }
+  } catch (err) {
+    console.error('上传头像错误:', err)
+    ElMessage.error(err.response?.data?.message || '头像上传失败，请重试')
+  } finally {
+    isUploadingAvatar.value = false
+  }
 }
 </script>
 
 <template>
   <div class="profile-wrapper">
+    <!-- 隐藏的文件输入框 -->
+    <input
+      ref="avatarInputRef"
+      type="file"
+      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+      style="display: none"
+      @change="handleAvatarChange"
+    />
+
     <!-- 左侧：用户头像卡片 -->
     <div class="profile-left">
       <div class="avatar-card">
-        <div class="avatar-wrapper">
+        <div class="avatar-wrapper" :class="{ uploading: isUploadingAvatar }">
           <img :src="getAvatarUrl()" alt="用户头像" class="avatar-img" />
           <div class="avatar-overlay" @click="editAvatar">
-            <el-icon><EditPen /></el-icon>
-            <span>修改头像</span>
+            <el-icon v-if="!isUploadingAvatar"><Upload /></el-icon>
+            <el-icon v-else class="loading-icon"><Loading /></el-icon>
+            <span>{{ isUploadingAvatar ? '上传中...' : '修改头像' }}</span>
           </div>
         </div>
         <h2 class="username">{{ userStore.userInfo.username || '用户' }}</h2>
@@ -312,6 +404,16 @@ const editAvatar = () => {
         </div>
       </div>
     </div>
+
+    <!-- 头像裁剪对话框 -->
+    <AvatarCropDialog
+      class="avatarcropdialog"
+      v-model="showAvatarDialog"
+      :image-url="previewImageUrl"
+      :loading="isUploadingAvatar"
+      @confirm="confirmUpload"
+      @cancel="cancelUpload"
+    />
   </div>
 </template>
 
@@ -326,6 +428,9 @@ const editAvatar = () => {
   gap: 20px;
   overflow-y: auto;
 
+  .avatarcropdialog {
+    // position: absolute;    
+  }
   /* 自定义滚动条 */
   &::-webkit-scrollbar {
     width: 8px;
@@ -373,6 +478,12 @@ const editAvatar = () => {
     border: 4px solid rgb(20, 31, 48);
     margin-bottom: 20px;
     cursor: pointer;
+    transition: all 0.3s;
+
+    &.uploading {
+      pointer-events: none;
+      opacity: 0.7;
+    }
 
     .avatar-img {
       width: 100%;
@@ -398,6 +509,10 @@ const editAvatar = () => {
       .el-icon {
         font-size: 24px;
         margin-bottom: 5px;
+      }
+
+      .loading-icon {
+        animation: rotate 1s linear infinite;
       }
 
       span {
@@ -825,6 +940,16 @@ const editAvatar = () => {
     flex-direction: column;
     gap: 15px;
     align-items: flex-start !important;
+  }
+}
+
+/* 旋转动画 */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>

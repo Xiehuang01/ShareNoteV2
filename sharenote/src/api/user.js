@@ -22,3 +22,11 @@ export const userGetUserInfoServer = () => request.get('/getUserInfo')
 // 更新用户信息
 export const userUpdateUserInfoServer = ({ username, email }) =>
   request.post('/updateUserInfo', { username, email })
+
+// 上传头像
+export const userUploadAvatarServer = (formData) =>
+  request.post('/uploadAvatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })

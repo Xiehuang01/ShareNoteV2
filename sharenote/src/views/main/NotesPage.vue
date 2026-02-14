@@ -58,7 +58,7 @@ const toc = ref([]) // 目录
 
 // 使用传递过来的 fileName，如果没有则使用默认值
 const getFileName = ref(props.fileName || 'welcome.md')
-const getFileType = ref(props.fileType.split('/')[1])
+const getFileType = ref(props.fileType ? (props.fileType.includes('/') ? props.fileType.split('/')[1] : props.fileType) : 'octet-stream')
 let headingCount = 0
 
 // 编辑器输入时更新 markdown 文本并实时预览
@@ -98,12 +98,13 @@ const updatePreview = (text) => {
 
     html.value = htmlArr.join('')
 
-    // 3. 高亮代码块
+    // 3. 高亮代码块并添加复制按钮
     nextTick(() => {
       document.querySelectorAll('.markdown-body pre code').forEach((block) => {
         block.classList.add('hljs')
         hljs.highlightElement(block)
       })
+      addCopyButtonToCodeBlocks()
     })
   } catch (error) {
     console.error('预览更新失败:', error)
@@ -152,6 +153,68 @@ const cancelEdit = () => {
   // 恢复原始内容
   loadMarkdownFile()
 }
+
+// 为代码块添加复制按钮
+const addCopyButtonToCodeBlocks = () => {
+  document.querySelectorAll('.markdown-body pre').forEach((preBlock) => {
+    // 检查是否已经添加过复制按钮
+    if (preBlock.querySelector('.copy-code-button')) {
+      return
+    }
+
+    // 创建复制按钮
+    const button = document.createElement('button')
+    button.className = 'copy-code-button'
+    button.innerHTML = `
+      <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <span class="copy-text">复制</span>
+    `
+
+    // 添加点击事件
+    button.addEventListener('click', async () => {
+      const code = preBlock.querySelector('code')
+      if (!code) return
+
+      try {
+        await navigator.clipboard.writeText(code.textContent)
+        
+        // 显示成功状态
+        button.innerHTML = `
+          <svg class="copy-icon success" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span class="copy-text">已复制</span>
+        `
+        button.classList.add('copied')
+
+        // 2秒后恢复原状
+        setTimeout(() => {
+          button.innerHTML = `
+            <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span class="copy-text">复制</span>
+          `
+          button.classList.remove('copied')
+        }, 2000)
+
+        ElMessage.success('代码已复制到剪贴板')
+      } catch (err) {
+        console.error('复制失败:', err)
+        ElMessage.error('复制失败，请手动复制')
+      }
+    })
+
+    // 将按钮添加到 pre 标签
+    preBlock.style.position = 'relative'
+    preBlock.appendChild(button)
+  })
+}
+
 // 用于保存所有创建的定时器 id，便于在停用/卸载时清理
 const pendingTimeouts = []
 
@@ -163,7 +226,7 @@ const pendingTimeouts = []
 // 监听 fileName 的变化，当用户点击不同笔记时重新加载
 watch(
   [() => props.fileName, () => props.fileType],
-  ([newFileName, newFileType]) => {
+  ([newFileName, newFileType], [oldFileName, oldFileType]) => {
     // 文件切换时自动退出编辑模式
     if (userStore.isEditMode) {
       userStore.setEditMode(false)
@@ -196,32 +259,56 @@ watch(
           isImageType.value
       )
 
+      // 判断新旧文件类型
+      const oldTypeStr = oldFileType || ''
+      const oldType = oldTypeStr.includes('/') ? oldTypeStr.split('/')[1] : oldTypeStr
+      const isOldMarkdown = oldType === 'octet-stream' || oldType === 'markdown'
+      const isNewMarkdown = getFileType.value === 'octet-stream' || getFileType.value === 'markdown'
+
       // 根据文件类型决定如何处理
-      if (
-        getFileType.value === 'octet-stream' ||
-        getFileType.value === 'markdown'
-      ) {
-        // Markdown 文件
+      if (isNewMarkdown) {
+        // Markdown 文件 - 不触发目录动画
         loadMarkdownFile()
+        // 如果从非 Markdown 切换到 Markdown，需要打开目录（无动画）
+        if (!isOldMarkdown && oldFileName) {
+          nextTick(() => {
+            if (markdownBodyRef.value && directoryRef.value) {
+              // 临时禁用过渡动画
+              markdownBodyRef.value.style.transition = 'none'
+              directoryRef.value.style.transition = 'none'
+              
+              markdownBodyRef.value.style.width = props.isExpandDirectory ? '70%' : '100%'
+              directoryRef.value.style.width = props.isExpandDirectory ? '30%' : '0%'
+              directoryRef.value.style.padding = props.isExpandDirectory ? '15px 20px' : '0px'
+              directoryRef.value.style.borderLeft = props.isExpandDirectory ? '2px solid rgb(215, 221, 227)' : 'none'
+              
+              // 恢复过渡动画
+              setTimeout(() => {
+                markdownBodyRef.value.style.transition = '0.5s'
+                directoryRef.value.style.transition = '0.5s'
+              }, 50)
+            }
+          })
+        }
       } else if (getFileType.value === 'pdf') {
         // PDF 文件
         console.log('这是PDF文件，立即关闭目录')
         loadPdfFile()
-        // 立即关闭目录
+        // 立即关闭目录（有动画）
         const _pdfTid = setTimeout(() => {
           console.log('PDF文件：强制执行 toggleDirectoryStatus(false)')
           toggleDirectoryStatus(false)
-        }, 200)
+        }, 50)
         pendingTimeouts.push(_pdfTid)
       } else if (isImageType.value) {
         // 图片文件
         console.log('这是图片文件，立即关闭目录')
         loadImageFile()
-        // 立即关闭目录
+        // 立即关闭目录（有动画）
         const _imgTid = setTimeout(() => {
           console.log('图片文件：强制执行 toggleDirectoryStatus(false)')
           toggleDirectoryStatus(false)
-        }, 200)
+        }, 50)
         pendingTimeouts.push(_imgTid)
       } else {
         // 未知文件类型，显示空状态
@@ -272,12 +359,13 @@ const loadMarkdownFile = async () => {
 
     html.value = htmlArr.join('')
 
-    // 3. 高亮代码块（延迟以确保 DOM 就绪），并记录定时器以便清理
+    // 3. 高亮代码块并添加复制按钮（延迟以确保 DOM 就绪），并记录定时器以便清理
     const _hlTid = setTimeout(() => {
       document.querySelectorAll('.markdown-body pre code').forEach((block) => {
         block.classList.add('hljs')
         hljs.highlightElement(block)
       })
+      addCopyButtonToCodeBlocks()
     })
     pendingTimeouts.push(_hlTid)
   } catch (error) {
@@ -543,22 +631,22 @@ watch(
     console.log('子组件监听到目录状态变化:', oldValue, '->', newValue)
     console.log('当前文件类型:', props.fileType)
 
-    // 如果当前文件是 PDF，强制不显示目录
-    if (props.fileType && props.fileType.includes('pdf')) {
-      console.log('PDF文件，强制关闭目录')
-      const _pdfTid2 = setTimeout(() => {
+    // 如果当前文件是 PDF 或图片，强制不显示目录
+    if (props.fileType && (props.fileType.includes('pdf') || imageTypes.some(type => props.fileType.includes(type)))) {
+      console.log('非Markdown文件，强制关闭目录')
+      const _nonMdTid = setTimeout(() => {
         console.log('执行 toggleDirectoryStatus(false)')
         toggleDirectoryStatus(false)
-      }, 100)
-      pendingTimeouts.push(_pdfTid2)
+      }, 50)
+      pendingTimeouts.push(_nonMdTid)
       return
     }
 
-    // 使用 setTimeout 确保 DOM 完全渲染
+    // Markdown 文件才响应目录状态变化
     const _tid = setTimeout(() => {
       console.log('执行 toggleDirectoryStatus(' + newValue + ')')
       toggleDirectoryStatus(newValue)
-    }, 100)
+    }, 50)
     pendingTimeouts.push(_tid)
   },
   { immediate: true }
@@ -566,145 +654,147 @@ watch(
 </script>
 
 <template>
-  <div class="wrapper">
-    <!-- 编辑模式：编辑器 + 预览 -->
-    <div
-      v-if="
-        userStore.isEditMode &&
-        (getFileType === 'octet-stream' || getFileType === 'markdown')
-      "
-      class="editor-container"
-    >
-      <!-- 左侧编辑器 -->
-      <div class="editor-pane">
-        <div class="editor-toolbar">
-          <span class="editor-title">编辑模式</span>
-          <div class="editor-actions">
-            <el-button
-              class="btn-cancel"
-              size="small"
-              @click="cancelEdit"
-              :disabled="isSaving"
-              >取消</el-button
-            >
-            <el-button
-              class="btn-save"
-              type="primary"
-              size="small"
-              @click="saveEdit"
-              :loading="isSaving"
-              >保存</el-button
-            >
+  <div>
+    <div class="wrapper">
+      <!-- 编辑模式：编辑器 + 预览 -->
+      <div
+        v-if="
+          userStore.isEditMode &&
+          (getFileType === 'octet-stream' || getFileType === 'markdown')
+        "
+        class="editor-container"
+      >
+        <!-- 左侧编辑器 -->
+        <div class="editor-pane">
+          <div class="editor-toolbar">
+            <span class="editor-title">编辑模式</span>
+            <div class="editor-actions">
+              <el-button
+                class="btn-cancel"
+                size="small"
+                @click="cancelEdit"
+                :disabled="isSaving"
+                >取消</el-button
+              >
+              <el-button
+                class="btn-save"
+                type="primary"
+                size="small"
+                @click="saveEdit"
+                :loading="isSaving"
+                >保存</el-button
+              >
+            </div>
           </div>
+          <textarea
+            v-model="markdownText"
+            @input="handleEditorInput(markdownText)"
+            class="markdown-editor"
+            placeholder="在此输入 Markdown 内容..."
+            spellcheck="false"
+          ></textarea>
         </div>
-        <textarea
-          v-model="markdownText"
-          @input="handleEditorInput(markdownText)"
-          class="markdown-editor"
-          placeholder="在此输入 Markdown 内容..."
-          spellcheck="false"
-        ></textarea>
+        <!-- 右侧预览 -->
+        <div class="preview-pane">
+          <div class="preview-header">预览</div>
+          <div
+            class="markdown-body preview-content"
+            v-html="html"
+            ref="markdownBodyRef"
+          ></div>
+        </div>
       </div>
-      <!-- 右侧预览 -->
-      <div class="preview-pane">
-        <div class="preview-header">预览</div>
-        <div
-          class="markdown-body preview-content"
-          v-html="html"
-          ref="markdownBodyRef"
-        ></div>
-      </div>
-    </div>
 
-    <!-- 预览模式：Markdown主内容 -->
-    <div
-      v-else-if="
-        html !== null &&
-        (getFileType === 'octet-stream' || getFileType === 'markdown')
-      "
-      class="markdown-body"
-      v-html="html"
-      ref="markdownBodyRef"
-      v-loading="isloading"
-    ></div>
+      <!-- 预览模式：Markdown主内容 -->
+      <div
+        v-else-if="
+          html !== null &&
+          (getFileType === 'octet-stream' || getFileType === 'markdown')
+        "
+        class="markdown-body"
+        v-html="html"
+        ref="markdownBodyRef"
+        v-loading="isloading"
+      ></div>
 
-    <!-- 图片内容 -->
-    <div
-      class="markdown-body"
-      v-else-if="isImageType"
-      ref="markdownBodyRef"
-      v-loading="isloading"
-    >
-      <div class="panzoom-wrapper">
-        <img id="panzoomImg" :src="imageUrl" alt="image" />
+      <!-- 图片内容 -->
+      <div
+        class="markdown-body"
+        v-else-if="isImageType"
+        ref="markdownBodyRef"
+        v-loading="isloading"
+      >
+        <div class="panzoom-wrapper">
+          <img id="panzoomImg" :src="imageUrl" alt="image" />
+        </div>
       </div>
-    </div>
 
-    <!-- PDF -->
-    <div
-      class="markdown-body"
-      v-else-if="getFileType === 'pdf'"
-      ref="markdownBodyRef"
-      v-loading="isloading"
-    >
-      <div class="vue-pdf-embed-wrapper">
-        <VuePdfEmbed
-          :source="pdfUrl"
-          class="pdf-component"
-          style="width: 100%"
-        />
+      <!-- PDF -->
+      <div
+        class="markdown-body"
+        v-else-if="getFileType === 'pdf'"
+        ref="markdownBodyRef"
+        v-loading="isloading"
+      >
+        <div class="vue-pdf-embed-wrapper">
+          <VuePdfEmbed
+            :source="pdfUrl"
+            class="pdf-component"
+            style="width: 100%"
+          />
+        </div>
+      </div>
+      <!-- 没有内容时的markdown-body -->
+      <div
+        class="markdown-body"
+        v-else
+        style="
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          width: 100%;
+        "
+        v-loading="isloading"
+      >
+        <!-- <el-icon :size="50" color="rgba(31, 32, 34, 0.5)"><Management /></el-icon>
+        <p style="margin: 0; padding: 0; color: rgba(31, 32, 34, 0.5)">
+          空空如也~
+        </p>
+        <p style="color: rgba(31, 32, 34, 0.5)">快去上传内容吧</p> -->
+        <div class="empty-state">
+          <el-empty description="空空如也~ 快去上传笔记吧" />
+        </div>
+      </div>
+      <!-- 目录 -->
+      <div v-if="!userStore.isEditMode" class="directory" ref="directoryRef">
+        <ul v-if="toc.length > 0">
+          <!-- 遍历 toc 中的每一项 -->
+          <li
+            v-for="item in toc"
+            :key="item.id"
+            :style="{ paddingLeft: (item.level - 1) * 16 + 'px' }"
+            @click="
+              () => {
+                activeId = item.id
+                scrollTo(item.id)
+              }
+            "
+          >
+            <!-- :style="{ marginLeft: (item.level - 1) * 16 + 'px' }": 根据标题层级缩进 -->
+            <!-- 点击跳转到对应标题 -->
+            <!-- 显示标题文字 -->
+            <p :class="{ active: item.id === activeId }">{{ item.text }}</p>
+          </li>
+        </ul>
+        <p v-else style="color: rgba(31, 32, 34, 0.5); text-align: center">
+          空空如也
+        </p>
       </div>
     </div>
-    <!-- 没有内容时的markdown-body -->
-    <div
-      class="markdown-body"
-      v-else
-      style="
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-      "
-      v-loading="isloading"
-    >
-      <!-- <el-icon :size="50" color="rgba(31, 32, 34, 0.5)"><Management /></el-icon>
-      <p style="margin: 0; padding: 0; color: rgba(31, 32, 34, 0.5)">
-        空空如也~
-      </p>
-      <p style="color: rgba(31, 32, 34, 0.5)">快去上传内容吧</p> -->
-      <div class="empty-state">
-        <el-empty description="空空如也~ 快去上传笔记吧" />
-      </div>
-    </div>
-    <!-- 目录 -->
-    <div v-if="!userStore.isEditMode" class="directory" ref="directoryRef">
-      <ul v-if="toc.length > 0">
-        <!-- 遍历 toc 中的每一项 -->
-        <li
-          v-for="item in toc"
-          :key="item.id"
-          :style="{ paddingLeft: (item.level - 1) * 16 + 'px' }"
-          @click="
-            () => {
-              activeId = item.id
-              scrollTo(item.id)
-            }
-          "
-        >
-          <!-- :style="{ marginLeft: (item.level - 1) * 16 + 'px' }": 根据标题层级缩进 -->
-          <!-- 点击跳转到对应标题 -->
-          <!-- 显示标题文字 -->
-          <p :class="{ active: item.id === activeId }">{{ item.text }}</p>
-        </li>
-      </ul>
-      <p v-else style="color: rgba(31, 32, 34, 0.5); text-align: center">
-        空空如也
-      </p>
-    </div>
+    
+    <LoadingOverlay v-if="updateLoading" />
   </div>
-
-  <LoadingOverlay v-if="updateLoading" />
 </template>
 
 <style lang="scss" scoped>
@@ -970,6 +1060,75 @@ watch(
     }
     .directory {
       width: 100%;
+    }
+  }
+}
+
+// 代码块复制按钮样式
+.markdown-body {
+  :deep(pre) {
+    position: relative;
+
+    .copy-code-button {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 6px 12px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(22, 187, 130, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: rgb(22, 187, 130);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.3s ease;
+      opacity: 0;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 10;
+
+      .copy-icon {
+        width: 16px;
+        height: 16px;
+        stroke: rgb(22, 187, 130);
+        transition: all 0.3s ease;
+
+        &.success {
+          stroke: rgb(22, 187, 130);
+        }
+      }
+
+      .copy-text {
+        font-weight: 500;
+        white-space: nowrap;
+      }
+
+      &:hover {
+        background-color: rgb(22, 187, 130);
+        color: rgb(255, 255, 255);
+        border-color: rgb(22, 187, 130);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(22, 187, 130, 0.3);
+
+        .copy-icon {
+          stroke: rgb(255, 255, 255);
+        }
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+
+      &.copied {
+        background-color: rgba(22, 187, 130, 0.1);
+        border-color: rgb(22, 187, 130);
+      }
+    }
+
+    &:hover .copy-code-button {
+      opacity: 1;
     }
   }
 }

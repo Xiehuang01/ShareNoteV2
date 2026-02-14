@@ -244,8 +244,13 @@ const TagColor = (fileType) => {
 // 点击笔记时
 const clickNotesActivedId = ref(null)
 const selectedFileName = ref('welcome.md')
-const selectedFileType = ref('')
+const selectedFileType = ref('application/octet-stream') // 默认为 Markdown 类型
 const selectedFileCustomName = ref(' ')
+
+// 计算属性：显示的笔记名称
+const clickNotesActivedName = computed(() => {
+  return selectedFileCustomName.value || 'ShareNote'
+})
 
 // 判断是否为 Markdown 文件
 const isMarkdownFile = (fileType) => {
@@ -463,8 +468,8 @@ const deleteFile = async () => {
         <div class="profile">
           <div class="avatar" @click="goProfilesPage">
             <img
-              src="../../../assets/d1a5429ead3d892513c3180e2aebb940.png"
-              alt=""
+              :src="userStore.userInfo.useravatarPath ? `${baseURL}${userStore.userInfo.useravatarPath}` : '/src/assets/d1a5429ead3d892513c3180e2aebb940.png'"
+              alt="用户头像"
             />
           </div>
           <div class="name">{{ userStore.userInfo.username }}</div>
@@ -567,7 +572,7 @@ const deleteFile = async () => {
       <!-- 标题 -->
       <div class="title-wrapper">
         <div class="title">
-          <p class="left">Hello World!11231221312312231221312312</p>
+          <p class="left">{{ clickNotesActivedName }}</p>
           <div class="right">
             <!-- 打开和关闭目录 -->
             <el-button
@@ -665,9 +670,11 @@ const deleteFile = async () => {
 
     <!-- 切换分组 -->
     <ChangeGroup ref="ChangeGroupRef"></ChangeGroup>
+
+    
   </div>
 
-  <LoadingOverlay v-if="uploadloading" />
+
 </template>
 
 <!-- 主要页面的导航栏和抽屉 -->
@@ -897,19 +904,29 @@ const deleteFile = async () => {
         padding: 10px 15px;
         border-top: 2px solid rgb(20, 31, 48);
         background-color: rgb(3, 6, 23);
-        img {
+        
+        .avatar {
           width: 100%;
           height: 53px;
-          border-radius: 50%;
-          box-sizing: border-box;
-          border: 2px solid rgb(237, 219, 255);
-          transition: 0.3s;
+          cursor: pointer;
+          
+          img {
+            width: 100%;
+            height: 53px;
+            border-radius: 50%;
+            box-sizing: border-box;
+            border: 2px solid rgb(237, 219, 255);
+            transition: 0.3s;
+            object-fit: cover;
+          }
+          
+          img:hover {
+            transform: scale(1.2);
+            border: 2px solid rgb(54, 211, 153);
+            box-shadow: 0px 0px 15px -5px rgb(54, 211, 153);
+          }
         }
-        img:hover {
-          transform: scale(1.2);
-          border: 2px solid rgb(54, 211, 153);
-          box-shadow: 0px 0px 15px -5px rgb(54, 211, 153);
-        }
+        
         .name {
           display: inline-block;
           width: 3em;

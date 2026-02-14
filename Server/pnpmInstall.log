@@ -27,3 +27,6 @@ axios请求访问其他网络资源
 
 10. pnpm install dayjs
 按照指定格式模板格式化时间戳
+
+11. pnpm install sharp
+图片处理工具
