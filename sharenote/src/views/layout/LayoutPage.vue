@@ -132,14 +132,52 @@ getAndInitUserInfo()
 
 // 获取用户的笔记列表
 const getUserNotesList = async () => {
+  console.log('开始加载笔记列表，isNotesLoading:', isNotesLoading.value)
+  isNotesLoading.value = true
   try {
     const res = await filesGetNotesListServer()
+    console.log('笔记列表 API 返回:', res)
     userStore.userNotesList = res.data
+
+    // 如果有笔记，自动选择第一个笔记
+    if (res.data && res.data.length > 0) {
+      const firstNote = res.data[0]
+      clickNotesActivedId.value = firstNote.fileId
+      selectedFileName.value = firstNote.fileName
+      selectedFileType.value = firstNote.fileType
+      selectedFileCustomName.value = firstNote.fileCustomName
+
+      // 更新 store
+      userStore.setSelectedNote({
+        fileId: firstNote.fileId,
+        fileName: firstNote.fileName,
+        fileType: firstNote.fileType,
+        fileCustomName: firstNote.fileCustomName
+      })
+      console.log('已选择第一个笔记:', firstNote.fileCustomName)
+    } else {
+      // 如果没有笔记，显示 welcome.md
+      clickNotesActivedId.value = null
+      selectedFileName.value = 'welcome.md'
+      selectedFileType.value = ''
+      selectedFileCustomName.value = ''
+      userStore.clearSelectedNote()
+      console.log('没有笔记，显示 welcome.md')
+    }
   } catch (err) {
-    console.error(err.response.data.message)
+    console.error('加载笔记列表出错:', err)
+    // 出错时也显示 welcome.md
+    selectedFileName.value = 'welcome.md'
+  } finally {
+    isNotesLoading.value = false
+    console.log('加载完成，isNotesLoading:', isNotesLoading.value)
   }
 }
-getUserNotesList()
+
+// 在组件挂载后加载笔记列表
+onMounted(() => {
+  getUserNotesList()
+})
 
 // 文件上传完成后的处理函数
 const handleUploadComplete = async () => {
@@ -243,9 +281,10 @@ const TagColor = (fileType) => {
 
 // 点击笔记时
 const clickNotesActivedId = ref(null)
-const selectedFileName = ref('welcome.md')
+const selectedFileName = ref(null) // 初始为 null，等待加载
 const selectedFileType = ref('application/octet-stream') // 默认为 Markdown 类型
 const selectedFileCustomName = ref(' ')
+const isNotesLoading = ref(true) // 添加加载状态
 
 // 计算属性：显示的笔记名称
 const clickNotesActivedName = computed(() => {
@@ -366,18 +405,10 @@ const deleteFile = async () => {
       uploadloading.value = false
       ElMessage.success('笔记删除成功')
 
-      // 清空当前选中的笔记信息
-      clickNotesActivedId.value = null
-      selectedFileName.value = 'welcome.md'
-      selectedFileType.value = ''
-
-      // 清空 store 中的选中笔记
-      userStore.clearSelectedNote()
-
       // 清空搜索框
       input2.value = ''
 
-      // 重新加载笔记列表
+      // 重新加载笔记列表（会自动选择第一个笔记或显示 welcome.md）
       await getUserNotesList()
     } else {
       ElMessage.error('删除笔记失败，请重试')
@@ -468,7 +499,11 @@ const deleteFile = async () => {
         <div class="profile">
           <div class="avatar" @click="goProfilesPage">
             <img
-              :src="userStore.userInfo.useravatarPath ? `${baseURL}${userStore.userInfo.useravatarPath}` : '/src/assets/d1a5429ead3d892513c3180e2aebb940.png'"
+              :src="
+                userStore.userInfo.useravatarPath
+                  ? `${baseURL}${userStore.userInfo.useravatarPath}`
+                  : '/src/assets/d1a5429ead3d892513c3180e2aebb940.png'
+              "
               alt="用户头像"
             />
           </div>
@@ -518,7 +553,11 @@ const deleteFile = async () => {
             </div>
             <!-- 笔记列表 -->
             <div class="list-contents">
-              <ul v-if="filteredNotesList.length > 0">
+              <transition-group
+                name="note-list"
+                tag="ul"
+                v-if="filteredNotesList.length > 0"
+              >
                 <li
                   v-for="item in filteredNotesList"
                   :key="item.fileId"
@@ -556,10 +595,16 @@ const deleteFile = async () => {
                     </div>
                   </div>
                 </li>
-              </ul>
-              <!-- 搜索结果为空的提示 -->
+              </transition-group>
+              <!-- 空状态提示 -->
               <div v-else class="empty-state">
-                <el-empty description="未找到匹配的笔记" />
+                <el-empty
+                  :description="
+                    input2
+                      ? '未找到匹配的笔记'
+                      : '暂无笔记，点击上方按钮添加笔记'
+                  "
+                />
               </div>
             </div>
           </div>
@@ -649,8 +694,10 @@ const deleteFile = async () => {
 
       <!-- 二级路由 -->
       <div class="router2">
+        <!-- 加载中状态 -->
+        <LoadingOverlay v-if="isNotesLoading" message="加载中..." />
         <!-- 二级路由出口 -->
-        <keep-alive>
+        <keep-alive v-else>
           <router-view
             ref="notesPageRef"
             class="routerView"
@@ -671,10 +718,9 @@ const deleteFile = async () => {
     <!-- 切换分组 -->
     <ChangeGroup ref="ChangeGroupRef"></ChangeGroup>
 
-    
+    <!-- 加载中遮罩 -->
+    <LoadingOverlay v-if="uploadloading" />
   </div>
-
-
 </template>
 
 <!-- 主要页面的导航栏和抽屉 -->
@@ -904,12 +950,12 @@ const deleteFile = async () => {
         padding: 10px 15px;
         border-top: 2px solid rgb(20, 31, 48);
         background-color: rgb(3, 6, 23);
-        
+
         .avatar {
           width: 100%;
           height: 53px;
           cursor: pointer;
-          
+
           img {
             width: 100%;
             height: 53px;
@@ -919,14 +965,14 @@ const deleteFile = async () => {
             transition: 0.3s;
             object-fit: cover;
           }
-          
+
           img:hover {
             transform: scale(1.2);
             border: 2px solid rgb(54, 211, 153);
             box-shadow: 0px 0px 15px -5px rgb(54, 211, 153);
           }
         }
-        
+
         .name {
           display: inline-block;
           width: 3em;
@@ -1201,7 +1247,9 @@ const deleteFile = async () => {
       height: 0;
       flex: 1;
       width: 100%;
+      position: relative; // 为 LoadingOverlay 提供定位上下文
       // background-color: rgb(3, 6, 23);
+
       .routerView {
         width: 100%;
         height: 100%;

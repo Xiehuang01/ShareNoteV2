@@ -42,6 +42,7 @@ const upload = multer({ storage })
 
 // 文件上传接口
 router.post('/uploadnotes', checkAuth, upload.array('file', 500), async (req, res) => {
+    console.log('========== 收到上传请求 ==========')
     const files = req.files
     const userid = req.userId
     const { fileCustomName } = req.body
@@ -52,16 +53,59 @@ router.post('/uploadnotes', checkAuth, upload.array('file', 500), async (req, re
     }
     
     try{
-        // 将文件路径上传到服务器
+        // 找出 Markdown 文件
+        const markdownFile = files.find(item => item.originalname.toLowerCase().endsWith('.md'))
+        let markdownId = null
+        
+        console.log('=== 开始处理文件上传 ===')
+        console.log('总文件数:', files.length)
+        console.log('是否有 Markdown 文件:', !!markdownFile)
+        
+        // 如果有 Markdown 文件，先插入到 files 表并获取 ID
+        if (markdownFile) {
+            const createdTimeWithoutFormat = Number(markdownFile.filename.split('_')[0])
+            const createdTime = dayjs(createdTimeWithoutFormat).format('YYYY-MM-DD HH:mm:ss')
+            const [result] = await pool.execute(
+                'insert into files(publisherId, fileCustomName, fileOriginalName, fileName, fileType, filePath, createdTime) values(?, ?, ?, ?, ?, ?, ?);',
+                [userid, fileCustomName, markdownFile.originalname, markdownFile.filename, markdownFile.mimetype, `/upload/files/${markdownFile.filename}`, createdTime]
+            )
+            markdownId = result.insertId
+            console.log('✓ Markdown 文件已插入 files 表，ID:', markdownId, '文件名:', markdownFile.originalname)
+        }
+        
+        // 处理其他文件
         for(const item of files){
+            console.log('处理文件:', item.originalname)
+            // 跳过已处理的 Markdown 文件
+            if (markdownFile && item.filename === markdownFile.filename) {
+                console.log('  → 跳过（已处理的 Markdown 文件）')
+                continue
+            }
+            
             const createdTimeWithoutFormat = Number(item.filename.split('_')[0])
             const createdTime = dayjs(createdTimeWithoutFormat).format('YYYY-MM-DD HH:mm:ss')
-            const [rows] = await pool.execute(
-                'insert into files(publisherId, fileCustomName, fileOriginalName, fileName, fileType, filePath, createdTime) values(?, ?, ?, ?, ?, ?, ?);',
-                [userid, fileCustomName, item.originalname, item.filename, item.mimetype, `/upload/files/${item.filename}`, createdTime]
-            )
-            // 服务器自动抛出错误
+            
+            // 判断是否为图片文件
+            const isImage = /\.(png|jpg|jpeg)$/i.test(item.originalname)
+            console.log('  → 是否为图片:', isImage, '| 是否有 markdownId:', !!markdownId)
+            
+            if (isImage && markdownId) {
+                // 图片文件且有关联的 Markdown，存入 markdownFiles 表
+                await pool.execute(
+                    'insert into markdownFiles(markdownId, uploadUserId, imgName, imgPath) values(?, ?, ?, ?);',
+                    [markdownId, userid, item.originalname, `/upload/files/${item.filename}`]
+                )
+                console.log('  ✓ 图片已插入 markdownFiles 表')
+            } else {
+                // 其他文件（如 PDF 或单独上传的图片）存入 files 表
+                await pool.execute(
+                    'insert into files(publisherId, fileCustomName, fileOriginalName, fileName, fileType, filePath, createdTime) values(?, ?, ?, ?, ?, ?, ?);',
+                    [userid, fileCustomName, item.originalname, item.filename, item.mimetype, `/upload/files/${item.filename}`, createdTime]
+                )
+                console.log('  ✓ 文件已插入 files 表')
+            }
         }
+        console.log('=== 文件上传处理完成 ===')
 
         // 返回数据给前端
         const returnFilesArray = files.map(item => ({
@@ -153,7 +197,6 @@ router.delete('/deleteFile/:fileId', checkAuth, async (req, res) => {
     const { fileId } = req.params
     const userid = req.userId
 
-
     if (!fileId) {
         return res.status(400).json({ status: 'fail', message: '缺少文件ID参数' })
     }
@@ -171,8 +214,40 @@ router.delete('/deleteFile/:fileId', checkAuth, async (req, res) => {
 
         const fileInfo = fileRows[0]
         const filePath = path.join(uploadPath, fileInfo.fileName)
+        
+        // 判断是否为 Markdown 文件
+        const isMarkdown = fileInfo.fileOriginalName.toLowerCase().endsWith('.md')
+        
+        if (isMarkdown) {
+            console.log('删除 Markdown 文件及其关联图片，fileId:', fileId)
+            
+            // 查询关联的图片
+            const [imageRows] = await pool.execute(
+                'SELECT * FROM markdownFiles WHERE markdownId = ?',
+                [fileId]
+            )
+            
+            console.log('找到关联图片数量:', imageRows.length)
+            
+            // 删除关联图片的物理文件
+            for (const img of imageRows) {
+                const imgFileName = path.basename(img.imgPath)
+                const imgFilePath = path.join(uploadPath, imgFileName)
+                if (fs.existsSync(imgFilePath)) {
+                    fs.unlinkSync(imgFilePath)
+                    console.log('已删除图片文件:', imgFileName)
+                }
+            }
+            
+            // 从数据库删除关联图片记录
+            await pool.execute(
+                'DELETE FROM markdownFiles WHERE markdownId = ?',
+                [fileId]
+            )
+            console.log('已删除 markdownFiles 表中的关联记录')
+        }
 
-        // 从数据库删除记录
+        // 从数据库删除文件记录
         const [deleteResult] = await pool.execute(
             'DELETE FROM files WHERE fileId = ? AND publisherId = ?',
             [fileId, userid]
@@ -182,9 +257,10 @@ router.delete('/deleteFile/:fileId', checkAuth, async (req, res) => {
             return res.status(500).json({ status: 'fail', message: '删除失败' })
         }
 
-        // 删除物理文件
+        // 删除主文件的物理文件
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath)
+            console.log('已删除主文件:', fileInfo.fileName)
         }
 
         res.json({

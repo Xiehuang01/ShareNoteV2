@@ -165,6 +165,45 @@ const handleUploadError = (error, file, fileList) => {
   ElMessage.error(`文件 ${file.name} 上传失败`)
 }
 
+// 自定义上传方法 - 一次性上传所有文件
+const customUpload = async () => {
+  const formData = new FormData()
+
+  // 添加所有文件
+  uploadFilesList.value.forEach((fileItem) => {
+    formData.append('file', fileItem.raw)
+  })
+
+  // 添加自定义文件名
+  formData.append('fileCustomName', formModel.value.filename)
+
+  try {
+    const response = await fetch(`${baseURL}/uploadnotes`, {
+      method: 'POST',
+      headers: {
+        Authorization: userStore.token
+      },
+      body: formData
+    })
+
+    const result = await response.json()
+
+    if (result.status === 'success') {
+      ElMessage.success('所有文件上传成功')
+      confirmMarkdownUpload.value = false
+      turnoffAddNote()
+      emit('upload-complete')
+    } else {
+      ElMessage.error('上传失败: ' + result.message)
+    }
+  } catch (error) {
+    console.error('上传错误:', error)
+    ElMessage.error('上传失败')
+  } finally {
+    uploadloading.value = false
+  }
+}
+
 // 上传确认上传
 const uploadClicked = async (ifForce) => {
   uploadloading.value = true
@@ -183,12 +222,11 @@ const uploadClicked = async (ifForce) => {
   const validateFilesRes = await validateFiles(ifForce)
   console.log(validateFilesRes)
   if (validateFilesRes) {
-    // 重置计数器
-    uploadSuccessCount.value = 0
-    totalFilesToUpload.value = uploadFilesList.value.length
-    console.log('开始上传，总文件数:', totalFilesToUpload.value)
-    uploadFileRef.value.submit()
-  } else console.log('上传错误:', validateFilesRes)
+    // 使用自定义上传方法
+    await customUpload()
+  } else {
+    console.log('上传错误:', validateFilesRes)
+  }
 }
 
 defineExpose({
@@ -217,16 +255,11 @@ defineExpose({
         ref="uploadFileRef"
         class="upload-demo"
         drag
-        :headers="{ Authorization: userStore.token }"
-        :data="{ fileCustomName: formModel.filename }"
-        :action="`${baseURL}/uploadnotes`"
         multiple
         :auto-upload="false"
         v-model:file-list="uploadFilesList"
         accept=".md, .pdf, .png, .jpg, jpeg"
         :before-upload="beforeUploadFiles"
-        @success="handleUploadSuccess"
-        @error="handleUploadError"
       >
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">
