@@ -5,6 +5,8 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 // 导入Element Plus
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+// 导入自定义的深色主题
+import './styles/element-dark-theme.css'
 // 自动把 px 转 rem
 
 import App from './App.vue'

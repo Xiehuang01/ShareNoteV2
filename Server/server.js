@@ -7,6 +7,7 @@ import geetest from './routers/geetest.js'
 import email from './routers/email.js'
 import user from './routers/user.js'
 import file from './routers/file.js'
+import group from './routers/group.js'
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use(geetest);
 app.use(email);
 app.use(user);
 app.use(file);
+app.use(group);
 
 // 默认路径
 app.get('/', (req, res) => {

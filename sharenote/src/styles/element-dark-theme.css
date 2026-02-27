@@ -1,0 +1,76 @@
+/* Element Plus 深色主题覆盖 */
+:root {
+  /* Dialog 相关 */
+  --el-dialog-bg-color: rgb(3, 6, 23);
+  --el-dialog-border-color: rgb(20, 31, 48);
+  
+  /* Overlay 遮罩层 */
+  --el-overlay-color-lighter: rgba(0, 0, 0, 0.7);
+  
+  /* 文字颜色 */
+  --el-text-color-primary: rgb(255, 255, 255);
+  --el-text-color-regular: rgb(200, 200, 200);
+  --el-text-color-secondary: rgb(107, 114, 128);
+  --el-text-color-placeholder: rgb(68, 78, 97);
+  
+  /* 边框颜色 */
+  --el-border-color: rgb(20, 31, 48);
+  --el-border-color-light: rgb(25, 35, 53);
+  --el-border-color-lighter: rgb(30, 40, 60);
+  
+  /* 背景颜色 */
+  --el-bg-color: rgb(3, 6, 23);
+  --el-bg-color-page: rgb(3, 6, 23);
+  --el-bg-color-overlay: rgb(8, 15, 32);
+  
+  /* 填充颜色 */
+  --el-fill-color: rgb(13, 24, 50);
+  --el-fill-color-light: rgb(15, 28, 56);
+  --el-fill-color-lighter: rgb(20, 31, 48);
+  --el-fill-color-blank: rgb(3, 6, 23);
+}
+
+/* 强制覆盖 Dialog 样式 */
+.el-overlay {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+.el-dialog {
+  background-color: rgb(3, 6, 23) !important;
+  border: 1px solid rgb(20, 31, 48) !important;
+  border-radius: 15px !important;
+  overflow: hidden;
+}
+
+.el-dialog__header {
+  background-color: rgb(3, 6, 23) !important;
+  border-bottom: 1px solid rgb(20, 31, 48) !important;
+}
+
+.el-dialog__title {
+  color: rgb(255, 255, 255) !important;
+}
+
+.el-dialog__body {
+  background-color: rgb(3, 6, 23) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+.el-dialog__close {
+  color: rgb(107, 114, 128) !important;
+}
+
+.el-dialog__close:hover {
+  color: rgb(54, 211, 153) !important;
+}
+
+/* Input 字数统计背景 */
+.el-input__count-inner {
+  background-color: transparent !important;
+  color: rgb(107, 114, 128) !important;
+}
+
+.el-input__count {
+  background-color: transparent !important;
+}
+

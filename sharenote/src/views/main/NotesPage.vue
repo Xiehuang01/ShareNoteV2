@@ -98,9 +98,20 @@ const updatePreview = (text) => {
 
     html.value = htmlArr.join('')
 
-    // 3. 高亮代码块并添加复制按钮
+    // 3. 处理图片路径，将相对路径转换为服务器路径
     nextTick(() => {
-      document.querySelectorAll('.markdown-body pre code').forEach((block) => {
+      // 处理图片路径（包括预览区域和正常显示区域）
+      document.querySelectorAll('.markdown-body img, .preview-content img').forEach((img) => {
+        const src = img.getAttribute('src')
+        // 如果是相对路径（不包含 http:// 或 https:// 或 /upload/）
+        if (src && !src.startsWith('http') && !src.startsWith('/upload/')) {
+          // 转换为服务器路径
+          img.setAttribute('src', `${baseURL}/upload/files/${src}`)
+        }
+      })
+      
+      // 高亮代码块并添加复制按钮
+      document.querySelectorAll('.markdown-body pre code, .preview-content pre code').forEach((block) => {
         block.classList.add('hljs')
         hljs.highlightElement(block)
       })
@@ -359,15 +370,31 @@ const loadMarkdownFile = async () => {
 
     html.value = htmlArr.join('')
 
-    // 3. 高亮代码块并添加复制按钮（延迟以确保 DOM 就绪），并记录定时器以便清理
-    const _hlTid = setTimeout(() => {
-      document.querySelectorAll('.markdown-body pre code').forEach((block) => {
-        block.classList.add('hljs')
-        hljs.highlightElement(block)
-      })
-      addCopyButtonToCodeBlocks()
+    // 3. 处理图片路径、高亮代码块并添加复制按钮（使用 nextTick 确保 DOM 就绪）
+    await nextTick()
+    
+    // 处理图片路径（包括预览区域和正常显示区域）
+    document.querySelectorAll('.markdown-body img, .preview-content img').forEach((img) => {
+      const src = img.getAttribute('src')
+      // 如果是相对路径（不包含 http:// 或 https:// 或 /upload/）
+      if (src && !src.startsWith('http') && !src.startsWith('/upload/')) {
+        // 转换为服务器路径
+        img.setAttribute('src', `${baseURL}/upload/files/${src}`)
+      }
     })
-    pendingTimeouts.push(_hlTid)
+    
+    // 高亮代码块
+    document.querySelectorAll('.markdown-body pre code, .preview-content pre code').forEach((block) => {
+      block.classList.add('hljs')
+      hljs.highlightElement(block)
+    })
+    addCopyButtonToCodeBlocks()
+    
+    // 4. 确保目录状态正确（在内容加载完成后）
+    await nextTick()
+    if (props.isExpandDirectory) {
+      toggleDirectoryStatus(true)
+    }
   } catch (error) {
     console.error('加载文件失败:', error)
     html.value = '<p>文件加载失败，请检查文件是否存在。</p>'
@@ -516,6 +543,17 @@ const loadPdfFile = () => {
 }
 
 onMounted(() => {
+  // 监听自定义保存事件
+  const handleSaveEvent = () => {
+    saveEdit()
+  }
+  window.addEventListener('trigger-save-edit', handleSaveEvent)
+  
+  // 在组件卸载时移除监听器
+  onBeforeUnmount(() => {
+    window.removeEventListener('trigger-save-edit', handleSaveEvent)
+  })
+  
   // 初始化文件类型
   if (props.fileType) {
     const typeStr = props.fileType
@@ -634,20 +672,18 @@ watch(
     // 如果当前文件是 PDF 或图片，强制不显示目录
     if (props.fileType && (props.fileType.includes('pdf') || imageTypes.some(type => props.fileType.includes(type)))) {
       console.log('非Markdown文件，强制关闭目录')
-      const _nonMdTid = setTimeout(() => {
+      nextTick(() => {
         console.log('执行 toggleDirectoryStatus(false)')
         toggleDirectoryStatus(false)
-      }, 50)
-      pendingTimeouts.push(_nonMdTid)
+      })
       return
     }
 
     // Markdown 文件才响应目录状态变化
-    const _tid = setTimeout(() => {
+    nextTick(() => {
       console.log('执行 toggleDirectoryStatus(' + newValue + ')')
       toggleDirectoryStatus(newValue)
-    }, 50)
-    pendingTimeouts.push(_tid)
+    })
   },
   { immediate: true }
 )

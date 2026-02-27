@@ -94,6 +94,45 @@ export const useUserStore = defineStore(
       isEditMode.value = mode
     }
 
+    // 当前选中的小组
+    const currentGroup = ref(null)
+
+    // 设置当前小组
+    const setCurrentGroup = (group) => {
+      currentGroup.value = group
+    }
+
+    // 清除当前小组
+    const clearCurrentGroup = () => {
+      currentGroup.value = null
+    }
+
+    // 当前查看的成员ID
+    const currentMemberId = ref(null)
+
+    // 设置当前成员ID
+    const setCurrentMemberId = (memberId) => {
+      currentMemberId.value = memberId
+    }
+
+    // 清除当前成员ID
+    const clearCurrentMemberId = () => {
+      currentMemberId.value = null
+    }
+
+    // 小组成员列表
+    const groupMembers = ref([])
+
+    // 设置小组成员列表
+    const setGroupMembers = (members) => {
+      groupMembers.value = members
+    }
+
+    // 清除小组成员列表
+    const clearGroupMembers = () => {
+      groupMembers.value = []
+    }
+
     return {
       token,
       setToken,
@@ -110,14 +149,23 @@ export const useUserStore = defineStore(
       removetChooseNote,
       isEditMode,
       toggleEditMode,
-      setEditMode
+      setEditMode,
+      currentGroup,
+      setCurrentGroup,
+      clearCurrentGroup,
+      currentMemberId,
+      setCurrentMemberId,
+      clearCurrentMemberId,
+      groupMembers,
+      setGroupMembers,
+      clearGroupMembers
     }
   },
   {
     persist: {
       key: 'sharenote-user',
       storage: localStorage,
-      paths: ['token', 'userInfo', 'userNotesList', 'selectedNote', 'chooseNote']
+      paths: ['token', 'userInfo', 'userNotesList', 'selectedNote', 'chooseNote', 'currentGroup', 'currentMemberId', 'groupMembers']
     }
   }
 )

@@ -49,3 +49,6 @@ marked 的扩展插件，专门用来生成 GitHub 风格的标题 id(slug),
 
 15. pnpm install vue-pdf-embed
 vue的pdf查看工具
+
+16. pnpm install jszip
+JSZip 库来创建 zip 文件

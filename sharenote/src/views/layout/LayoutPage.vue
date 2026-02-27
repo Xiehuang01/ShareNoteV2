@@ -5,8 +5,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import ChangeGroup from '@/components/ChangeGroup.vue'
 import AddNotes from '@/components/AddNotes.vue'
+import JoinGroup from '@/components/JoinGroup.vue'
 import { userGetUserInfoServer } from '@/api/user'
 import { filesGetNotesListServer, filesDeleteNoteServer } from '@/api/files'
+import { groupGetUserGroupsServer, groupGetMembersServer, groupGetGroupNotesServer } from '@/api/group'
+import JSZip from 'jszip'
 import { baseURL } from '@/utils/request'
 // import { Hide, View } from '@element-plus/icons-vue'
 import {
@@ -33,6 +36,7 @@ const userStore = useUserStore()
 
 const ChangeGroupRef = ref(null)
 const AddNotesRef = ref(null)
+const JoinGroupRef = ref(null)
 const menu = ref(null)
 const menuSearchUpload = ref(null)
 const notesPageRef = ref(null)
@@ -43,10 +47,8 @@ const isExpand = ref(true)
 const isMenuDisabled = ref(false)
 // btn是否点击
 const isActivedClick = ref('Home')
-// 小组成员avatar是否选择
-const isActivedChoice = ref(true)
-// note是否被点击
-// const isClickedNote = ref(true)
+// 小组成员avatar是否选择（不持久化，仅用于UI显示）
+const isActivedChoice = ref(null)
 
 // 折叠还是收起列表栏
 const toggleFoldStatus = () => {
@@ -135,7 +137,26 @@ const getUserNotesList = async () => {
   console.log('开始加载笔记列表，isNotesLoading:', isNotesLoading.value)
   isNotesLoading.value = true
   try {
-    const res = await filesGetNotesListServer()
+    let res
+    // 如果选中了小组，加载小组笔记
+    if (userStore.currentGroup) {
+      if (userStore.currentMemberId) {
+        // 加载小组笔记，然后过滤出特定成员的笔记
+        res = await groupGetGroupNotesServer(userStore.currentGroup.groupId)
+        // 过滤出该成员的笔记
+        res.data = res.data.filter(note => note.publisherId === userStore.currentMemberId)
+        console.log('加载成员笔记，成员ID:', userStore.currentMemberId, '笔记数量:', res.data.length)
+      } else {
+        // 加载整个小组的笔记
+        res = await groupGetGroupNotesServer(userStore.currentGroup.groupId)
+        console.log('加载小组笔记，小组ID:', userStore.currentGroup.groupId, '笔记数量:', res.data.length)
+      }
+    } else {
+      // 加载用户自己的笔记
+      res = await filesGetNotesListServer()
+      console.log('加载个人笔记，笔记数量:', res.data.length)
+    }
+    
     console.log('笔记列表 API 返回:', res)
     userStore.userNotesList = res.data
 
@@ -174,8 +195,75 @@ const getUserNotesList = async () => {
   }
 }
 
+// 加载小组成员
+const loadGroupMembers = async (groupId) => {
+  try {
+    const res = await groupGetMembersServer(groupId)
+    if (res.status === 'success') {
+      // 确保当前用户排在第一位
+      const members = res.data
+      const currentUserIndex = members.findIndex(m => m.id === userStore.userInfo.userid)
+      if (currentUserIndex > 0) {
+        const currentUser = members.splice(currentUserIndex, 1)[0]
+        members.unshift(currentUser)
+      }
+      userStore.setGroupMembers(members)
+      console.log('小组成员加载完成:', members)
+    }
+  } catch (error) {
+    console.error('加载小组成员失败:', error)
+    ElMessage.error('加载小组成员失败')
+  }
+}
+
+// 切换小组
+const handleGroupSwitched = async (group) => {
+  userStore.setCurrentGroup(group)
+  userStore.setCurrentMemberId(null)
+  isActivedChoice.value = null
+  console.log('切换到小组:', group.groupName)
+  
+  // 加载小组成员
+  await loadGroupMembers(group.groupId)
+  
+  // 加载小组笔记
+  await getUserNotesList()
+}
+
+// 小组创建成功
+const handleGroupCreated = async (group) => {
+  userStore.setCurrentGroup(group)
+  userStore.setCurrentMemberId(null)
+  isActivedChoice.value = null
+  
+  // 加载小组成员
+  await loadGroupMembers(group.groupId)
+  
+  // 加载小组笔记
+  await getUserNotesList()
+}
+
+// 加入小组成功
+const handleGroupJoined = () => {
+  ElMessage.success('加入小组成功，请在切换小组中选择')
+}
+
+// 点击小组成员头像
+const clickGroupMember = async (member, index) => {
+  isActivedChoice.value = index
+  userStore.setCurrentMemberId(member.id)
+  console.log('点击成员:', member.username, 'ID:', member.id)
+  
+  // 加载该成员的笔记
+  await getUserNotesList()
+}
+
 // 在组件挂载后加载笔记列表
 onMounted(() => {
+  // 如果有保存的小组信息，恢复小组成员列表
+  if (userStore.currentGroup) {
+    loadGroupMembers(userStore.currentGroup.groupId)
+  }
   getUserNotesList()
 })
 
@@ -284,7 +372,7 @@ const clickNotesActivedId = ref(null)
 const selectedFileName = ref(null) // 初始为 null，等待加载
 const selectedFileType = ref('application/octet-stream') // 默认为 Markdown 类型
 const selectedFileCustomName = ref(' ')
-const isNotesLoading = ref(true) // 添加加载状态
+const isNotesLoading = ref(true) // 笔记列表加载状态
 
 // 计算属性：显示的笔记名称
 const clickNotesActivedName = computed(() => {
@@ -315,8 +403,15 @@ const handleEditClick = () => {
     ElMessage.warning('只有 Markdown 文件支持编辑')
     return
   }
-  // 使用 store 切换编辑模式
-  userStore.toggleEditMode()
+  
+  // 如果已经在编辑模式，则触发保存
+  if (userStore.isEditMode) {
+    // 通过自定义事件触发保存
+    window.dispatchEvent(new CustomEvent('trigger-save-edit'))
+  } else {
+    // 否则进入编辑模式
+    userStore.setEditMode(true)
+  }
 }
 
 // 处理编辑模式变化
@@ -378,7 +473,222 @@ const clickNotes = (fileId, fileName, fileType, fileCustomName) => {
   }
 }
 
-// 删除文件的函数
+// 下载文件
+const downloadFile = async () => {
+  if (!selectedFileName.value) {
+    ElMessage.warning('没有可下载的文件')
+    return
+  }
+
+  try {
+    const isMarkdown = isMarkdownFile(selectedFileType.value)
+    
+    if (isMarkdown) {
+      // Markdown 文件：打包图片一起下载
+      await downloadMarkdownWithImages()
+    } else {
+      // 非 Markdown 文件：直接下载
+      await downloadSingleFile()
+    }
+  } catch (error) {
+    console.error('下载文件失败:', error)
+    ElMessage.error('下载失败，请重试')
+  }
+}
+
+// 下载单个文件
+const downloadSingleFile = async () => {
+  const response = await fetch(`${baseURL}/download?path=/upload/files/${selectedFileName.value}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': userStore.token
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error('下载失败')
+  }
+
+  const blob = await response.blob()
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = selectedFileCustomName.value || selectedFileName.value
+  document.body.appendChild(a)
+  a.click()
+  
+  window.URL.revokeObjectURL(url)
+  document.body.removeChild(a)
+  
+  ElMessage.success('下载成功')
+}
+
+// 下载 Markdown 及其图片（打包成 zip）
+const downloadMarkdownWithImages = async () => {
+  const loadingMsg = ElMessage.info('正在打包文件...')
+  
+  try {
+    console.log('当前 Markdown 文件名:', selectedFileName.value)
+    
+    // 提取 Markdown 文件所在的目录路径
+    const mdFileDir = selectedFileName.value.includes('/') 
+      ? selectedFileName.value.substring(0, selectedFileName.value.lastIndexOf('/') + 1)
+      : ''
+    console.log('Markdown 文件目录:', mdFileDir)
+    
+    // 1. 下载 Markdown 文件
+    const mdResponse = await fetch(`${baseURL}/download?path=/upload/files/${selectedFileName.value}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': userStore.token
+      }
+    })
+
+    if (!mdResponse.ok) {
+      throw new Error('下载 Markdown 文件失败')
+    }
+
+    const mdBlob = await mdResponse.blob()
+    const mdText = await mdBlob.text()
+    
+    console.log('Markdown 内容预览:', mdText.substring(0, 500))
+    
+    // 2. 解析 Markdown 中的图片路径（支持多种格式）
+    const imageRegex = /!\[.*?\]\((.*?)\)|<img[^>]+src=["']([^"']+)["']/g
+    const imagePaths = new Set() // 使用 Set 去重
+    let match
+    
+    while ((match = imageRegex.exec(mdText)) !== null) {
+      const imagePath = match[1] || match[2] // 支持 ![]() 和 <img> 两种格式
+      if (imagePath) {
+        console.log('找到图片路径:', imagePath)
+        // 只处理本地路径的图片（排除外链和 base64）
+        if (!imagePath.startsWith('http://') && 
+            !imagePath.startsWith('https://') && 
+            !imagePath.startsWith('data:')) {
+          imagePaths.add(imagePath)
+          console.log('添加到下载列表:', imagePath)
+        }
+      }
+    }
+    
+    console.log('总共找到图片数量:', imagePaths.size)
+    
+    // 3. 创建 ZIP 文件
+    const zip = new JSZip()
+    
+    // 添加 Markdown 文件（确保有 .md 后缀）
+    let mdFileName = selectedFileCustomName.value || selectedFileName.value
+    if (!mdFileName.endsWith('.md')) {
+      mdFileName += '.md'
+    }
+    zip.file(mdFileName, mdBlob)
+    
+    // 4. 下载并添加所有图片
+    const imagePathsArray = Array.from(imagePaths)
+    if (imagePathsArray.length > 0) {
+      const imageFolder = zip.folder('images')
+      let successCount = 0
+      
+      for (const imagePath of imagePathsArray) {
+        try {
+          console.log('开始处理图片:', imagePath)
+          
+          // 处理图片路径
+          let cleanPath = imagePath.trim()
+          
+          // 如果路径包含完整的 URL（http://localhost:3000/upload/files/xxx.jpg）
+          if (cleanPath.includes('localhost:3000')) {
+            const urlMatch = cleanPath.match(/localhost:3000\/(.+)/)
+            if (urlMatch) {
+              cleanPath = urlMatch[1]
+              console.log('提取 URL 路径:', cleanPath)
+            }
+          }
+          
+          // 如果路径以 /upload/ 开头，移除前导斜杠
+          if (cleanPath.startsWith('/upload/')) {
+            cleanPath = cleanPath.substring(1)
+            console.log('移除前导斜杠:', cleanPath)
+          }
+          
+          // 如果路径以 upload/files/ 开头，直接使用
+          // 否则，如果不包含 upload/files，需要和 Markdown 文件在同一目录
+          if (!cleanPath.startsWith('upload/files/')) {
+            // 移除所有前导斜杠
+            cleanPath = cleanPath.replace(/^\/+/, '')
+            // 使用 Markdown 文件所在的目录 + 图片文件名
+            cleanPath = `upload/files/${mdFileDir}${cleanPath}`
+            console.log('使用 Markdown 文件目录，最终路径:', cleanPath)
+          }
+          
+          // 尝试两种方式：先用 baseURL 直接访问，如果失败再用 download 接口
+          let imageUrl = `${baseURL}/${cleanPath}`
+          console.log('尝试直接访问 URL:', imageUrl)
+          
+          let imgResponse = await fetch(imageUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': userStore.token
+            }
+          })
+          
+          // 如果直接访问失败，尝试使用 download 接口
+          if (!imgResponse.ok) {
+            console.log('直接访问失败，尝试 download 接口')
+            imageUrl = `${baseURL}/download?path=/${cleanPath}`
+            console.log('使用 download 接口 URL:', imageUrl)
+            imgResponse = await fetch(imageUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': userStore.token
+              }
+            })
+          }
+          
+          console.log('图片响应状态:', imgResponse.status)
+          
+          if (imgResponse.ok) {
+            const imgBlob = await imgResponse.blob()
+            const fileName = cleanPath.split('/').pop()
+            imageFolder.file(fileName, imgBlob)
+            successCount++
+            console.log('✅ 图片下载成功:', fileName, '大小:', imgBlob.size, 'bytes')
+          } else {
+            console.warn('❌ 图片下载失败:', imageUrl, '状态码:', imgResponse.status)
+          }
+        } catch (err) {
+          console.warn('❌ 下载图片出错:', imagePath, err)
+        }
+      }
+      
+      console.log(`成功打包 ${successCount}/${imagePathsArray.length} 张图片`)
+    }
+    
+    // 5. 生成并下载 ZIP
+    const zipBlob = await zip.generateAsync({ type: 'blob' })
+    const url = window.URL.createObjectURL(zipBlob)
+    const a = document.createElement('a')
+    a.href = url
+    // 确保文件名包含 .md 后缀，然后替换为 .zip
+    let zipFileName = selectedFileCustomName.value || selectedFileName.value
+    if (!zipFileName.endsWith('.md')) {
+      zipFileName += '.md'
+    }
+    a.download = zipFileName.replace(/\.md$/, '.zip')
+    document.body.appendChild(a)
+    a.click()
+    
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    
+    loadingMsg.close()
+    ElMessage.success(`下载成功${imagePathsArray.length > 0 ? `（包含 ${imagePathsArray.length} 张图片）` : ''}`)
+  } catch (error) {
+    loadingMsg.close()
+    throw error
+  }
+}
 const deleteFile = async () => {
   // 检查是否选中了笔记
   if (!clickNotesActivedId.value) {
@@ -467,24 +777,22 @@ const deleteFile = async () => {
         <div class="group">
           <div class="group-avatars">
             <ul>
-              <li :class="{ isChoose: isActivedChoice }">
-                <p class="name">name</p>
+              <li 
+                v-for="(member, index) in userStore.groupMembers" 
+                :key="member.id"
+                :class="{ isChoose: isActivedChoice === index }"
+                @click="clickGroupMember(member, index)"
+              >
+                <p class="name">{{ member.username }}</p>
                 <img
-                  src="../../../assets/d1a5429ead3d892513c3180e2aebb940.png"
-                  alt=""
-                />
-              </li>
-              <li v-for="n in 9" :key="n">
-                <p class="name">name</p>
-                <img
-                  src="../../../assets/d1a5429ead3d892513c3180e2aebb940.png"
-                  alt=""
+                  :src="member.avatarpath ? `${baseURL}${member.avatarpath}` : '/src/assets/d1a5429ead3d892513c3180e2aebb940.png'"
+                  :alt="member.username"
                 />
               </li>
             </ul>
           </div>
           <div class="group-change">
-            <div class="add btn-base">
+            <div class="add btn-base" @click="JoinGroupRef.turnonJoinGroup()">
               <el-icon><Plus /></el-icon>
             </div>
             <div
@@ -515,7 +823,7 @@ const deleteFile = async () => {
         <!-- 笔记列表 -->
         <div class="list">
           <div class="user-title">
-            <p>{{ userStore.userInfo.username }}'s notes</p>
+            <p>{{ userStore.currentGroup ? userStore.currentGroup.groupName : userStore.userInfo.username + "'s notes" }}</p>
             <p>
               · 共发布{{
                 userStore.userNotesList.length > 0
@@ -553,10 +861,13 @@ const deleteFile = async () => {
             </div>
             <!-- 笔记列表 -->
             <div class="list-contents">
+              <!-- 加载状态 -->
+              <LoadingOverlay v-if="isNotesLoading" message="加载笔记列表..." />
+              <!-- 笔记列表 -->
               <transition-group
+                v-else-if="filteredNotesList.length > 0"
                 name="note-list"
                 tag="ul"
-                v-if="filteredNotesList.length > 0"
               >
                 <li
                   v-for="item in filteredNotesList"
@@ -670,23 +981,18 @@ const deleteFile = async () => {
                 height: 100%;
               "
             ></el-button>
-            <!-- 保存 -->
-            <a
-              :href="`${baseURL}/download?path=/upload/files/${selectedFileName}`"
-              download
-              style="color: inherit; text-decoration: none; margin-left: 12px"
-            >
-              <el-button
-                :icon="FolderChecked"
-                color="#16bb82"
-                style="
-                  color: rgb(3, 6, 21);
-                  border: none;
-                  height: 100%;
-                  width: 80px;
-                "
-                >保存</el-button
-              ></a
+            <!-- 下载 -->
+            <el-button
+              :icon="FolderChecked"
+              color="#16bb82"
+              @click="downloadFile"
+              style="
+                color: rgb(3, 6, 21);
+                border: none;
+                height: 100%;
+                width: 80px;
+              "
+              >下载</el-button
             >
           </div>
         </div>
@@ -694,10 +1000,8 @@ const deleteFile = async () => {
 
       <!-- 二级路由 -->
       <div class="router2">
-        <!-- 加载中状态 -->
-        <LoadingOverlay v-if="isNotesLoading" message="加载中..." />
         <!-- 二级路由出口 -->
-        <keep-alive v-else>
+        <keep-alive>
           <router-view
             ref="notesPageRef"
             class="routerView"
@@ -710,13 +1014,23 @@ const deleteFile = async () => {
       </div>
     </div>
     <!--加入分组 -->
+    <JoinGroup
+      ref="JoinGroupRef"
+      @group-joined="handleGroupJoined"
+    ></JoinGroup>
+
+    <!--加入分组 -->
     <AddNotes
       ref="AddNotesRef"
       @upload-complete="handleUploadComplete"
     ></AddNotes>
 
     <!-- 切换分组 -->
-    <ChangeGroup ref="ChangeGroupRef"></ChangeGroup>
+    <ChangeGroup 
+      ref="ChangeGroupRef"
+      @group-switched="handleGroupSwitched"
+      @group-created="handleGroupCreated"
+    ></ChangeGroup>
 
     <!-- 加载中遮罩 -->
     <LoadingOverlay v-if="uploadloading" />
@@ -1144,6 +1458,21 @@ const deleteFile = async () => {
               align-items: center;
               height: 100%;
               width: 100%;
+            }
+
+            .notes-loading {
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              height: 100%;
+              width: 100%;
+              color: rgb(22, 187, 130);
+
+              p {
+                margin-top: 10px;
+                font-size: 14px;
+              }
             }
           }
         }

@@ -12,9 +12,13 @@ const instance = axios.create({
 instance.interceptors.request.use(
   (config) => {
     const userStore = useUserStore()
+    console.log('请求拦截器 - Token:', userStore.token)
     if (userStore.token) {
       // 存在token
       config.headers.Authorization = userStore.token
+      console.log('请求拦截器 - 已添加 Authorization 头')
+    } else {
+      console.warn('请求拦截器 - Token 不存在，可能需要重新登录')
     }
     return config
   },

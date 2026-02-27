@@ -61,8 +61,34 @@ router.post('/uploadnotes', checkAuth, upload.array('file', 500), async (req, re
         console.log('总文件数:', files.length)
         console.log('是否有 Markdown 文件:', !!markdownFile)
         
-        // 如果有 Markdown 文件，先插入到 files 表并获取 ID
+        // 如果有 Markdown 文件，先处理图片路径替换
         if (markdownFile) {
+            // 创建图片原始名到新文件名的映射
+            const imageMap = {}
+            files.forEach(file => {
+                const isImage = /\.(png|jpg|jpeg|gif|bmp|webp|svg)$/i.test(file.originalname)
+                if (isImage) {
+                    imageMap[file.originalname] = file.filename
+                }
+            })
+            
+            // 读取 Markdown 文件内容
+            const markdownPath = path.join(uploadPath, markdownFile.filename)
+            let markdownContent = fs.readFileSync(markdownPath, 'utf8')
+            
+            // 替换图片路径
+            Object.keys(imageMap).forEach(originalName => {
+                const newName = imageMap[originalName]
+                // 匹配 ![alt](图片名) 格式
+                const regex = new RegExp(`!\\[([^\\]]*)\\]\\(${originalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'g')
+                markdownContent = markdownContent.replace(regex, `![$1](${newName})`)
+            })
+            
+            // 写回文件
+            fs.writeFileSync(markdownPath, markdownContent, 'utf8')
+            console.log('✓ Markdown 文件图片路径已更新')
+            
+            // 插入到 files 表并获取 ID
             const createdTimeWithoutFormat = Number(markdownFile.filename.split('_')[0])
             const createdTime = dayjs(createdTimeWithoutFormat).format('YYYY-MM-DD HH:mm:ss')
             const [result] = await pool.execute(
