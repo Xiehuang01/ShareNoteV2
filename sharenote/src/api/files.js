@@ -7,3 +7,7 @@ export const filesDeleteNoteServer = (fileId) =>
 
 // 保存/更新 Markdown 文件
 export const filesUpdateFileServer = (data) => request.post('/updateFile', data)
+
+// 删除图片文件
+export const filesDeleteImageServer = (imageName) =>
+  request.delete(`/deleteImage/${imageName}`)

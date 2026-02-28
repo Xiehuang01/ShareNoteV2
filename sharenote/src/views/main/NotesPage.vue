@@ -19,7 +19,7 @@ import 'highlight.js/styles/github.css' // 高亮主题
 import { ElMessage } from 'element-plus'
 // import { Management } from '@element-plus/icons-vue'
 import { baseURL } from '@/utils/request'
-import { filesUpdateFileServer } from '@/api/files'
+import { filesUpdateFileServer, filesDeleteImageServer } from '@/api/files'
 import Panzoom from '@panzoom/panzoom'
 import VuePdfEmbed from 'vue-pdf-embed'
 import { useUserStore } from '@/stores/user'
@@ -48,6 +48,7 @@ const userStore = useUserStore()
 const isloading = ref(null)
 const updateLoading = ref(false)
 const markdownText = ref('') // 编辑器中的文本
+const originalMarkdownText = ref('') // 原始文本，用于对比
 const isSaving = ref(false) // 保存状态
 
 const isImageType = ref(false)
@@ -124,6 +125,25 @@ const updatePreview = (text) => {
   }
 }
 
+// 提取 Markdown 中的图片引用
+const extractImageReferences = (markdown) => {
+  const imageRegex = /!\[.*?\]\((.*?)\)/g
+  const images = []
+  let match
+  
+  while ((match = imageRegex.exec(markdown)) !== null) {
+    const imagePath = match[1]
+    // 处理本地图片（可能是 image-xxx 或带时间戳的文件名）
+    if (imagePath && !imagePath.startsWith('http') && !imagePath.startsWith('/upload/')) {
+      // 提取文件名（去掉可能的路径前缀）
+      const fileName = imagePath.split('/').pop()
+      images.push(fileName)
+    }
+  }
+  
+  return images
+}
+
 // 保存编辑后的内容
 const saveEdit = async () => {
   updateLoading.value = true
@@ -135,14 +155,40 @@ const saveEdit = async () => {
 
   try {
     isSaving.value = true
+    
+    // 检测被删除的图片
+    const originalImages = extractImageReferences(originalMarkdownText.value)
+    const currentImages = extractImageReferences(markdownText.value)
+    
+    // 找出被删除的图片
+    const deletedImages = originalImages.filter(img => !currentImages.includes(img))
+    
+    console.log('原始图片:', originalImages)
+    console.log('当前图片:', currentImages)
+    console.log('被删除的图片:', deletedImages)
+    
+    // 先保存文件
     const res = await filesUpdateFileServer({
       fileName: getFileName.value,
       content: markdownText.value
     })
 
     if (res.status === 'success') {
+      // 删除未使用的图片
+      if (deletedImages.length > 0) {
+        console.log('开始删除未使用的图片...')
+        const deletePromises = deletedImages.map(imageName => 
+          filesDeleteImageServer(imageName).catch(err => {
+            console.error(`删除图片 ${imageName} 失败:`, err)
+          })
+        )
+        await Promise.all(deletePromises)
+        ElMessage.success(`保存成功，已删除 ${deletedImages.length} 张未使用的图片`)
+      } else {
+        ElMessage.success('保存成功')
+      }
+      
       updateLoading.value = false
-      ElMessage.success('保存成功')
       // 退出编辑模式
       userStore.setEditMode(false)
       // 重新加载文件
@@ -359,6 +405,8 @@ const loadMarkdownFile = async () => {
 
     // 保存原始 Markdown 文本到编辑器
     markdownText.value = text
+    // 保存原始内容用于对比
+    originalMarkdownText.value = text
 
     // 清空目录数组，重置计数器
     toc.value = []
@@ -657,6 +705,25 @@ const openAIAssistant = () => {
   }
 }
 
+// 选中的文本
+const selectedText = ref('')
+
+// 处理文本选择
+const handleTextSelection = () => {
+  const selection = window.getSelection()
+  const text = selection.toString().trim()
+  if (text) {
+    selectedText.value = text
+  }
+}
+
+// 打开 AI 助手并传入选中的文本
+const openAIAssistantWithSelection = () => {
+  if (aiAssistantRef.value) {
+    aiAssistantRef.value.openWithSelection(selectedText.value)
+  }
+}
+
 // 处理 AI 插入文本
 const handleInsertText = (text) => {
   // 在光标位置插入文本
@@ -763,23 +830,41 @@ watch(
           <textarea
             v-model="markdownText"
             @input="handleEditorInput(markdownText)"
+            @mouseup="handleTextSelection"
+            @keyup="handleTextSelection"
             class="markdown-editor"
             placeholder="在此输入 Markdown 内容..."
             spellcheck="false"
           ></textarea>
+          <!-- AI 悬浮按钮 - 选中文本时显示 -->
+          <transition name="fade">
+            <div
+              v-if="selectedText && userStore.isEditMode"
+              class="ai-float-button"
+              @click="openAIAssistantWithSelection"
+              title="AI 润色选中文本"
+            >
+              <el-icon :size="20"><MagicStick /></el-icon>
+              <span>AI 润色</span>
+            </div>
+          </transition>
         </div>
         <!-- 右侧预览 -->
         <div class="preview-pane">
           <div class="preview-header">
             <span>预览</span>
-            <el-button
-              :icon="MagicStick"
-              class="btn-ai"
-              circle
-              size="small"
-              @click="openAIAssistant"
-              title="AI 辅助写作"
-            ></el-button>
+            <div class="preview-actions">
+              <!-- AI 智能写作按钮 -->
+              <div class="ai-smart-button" @click="openAIAssistant" title="AI 智能写作">
+                <div class="ai-icon-wrapper">
+                  <el-icon :size="18"><MagicStick /></el-icon>
+                </div>
+                <div class="ai-text">
+                  <span class="ai-title">AI 智能写作</span>
+                  <span class="ai-subtitle">智能生成、润色、优化</span>
+                </div>
+              </div>
+            </div>
           </div>
           <div
             class="markdown-body preview-content"
@@ -882,9 +967,10 @@ watch(
     <!-- AI 助手 -->
     <AIAssistant
       ref="aiAssistantRef"
-      :selected-text="''"
+      :selected-text="selectedText"
       @insert-text="handleInsertText"
       @replace-text="handleReplaceText"
+      @clear-selection="selectedText = ''"
     />
   </div>
 </template>
@@ -988,6 +1074,41 @@ watch(
         color: rgb(31, 32, 34);
         background: rgb(255, 255, 255);
         box-sizing: border-box;
+        position: relative;
+      }
+
+      // AI 悬浮按钮 - 选中文本时出现
+      .ai-float-button {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 16px;
+        background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
+        border-radius: 24px;
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+
+        &:hover {
+          transform: translateY(-2px) scale(1.02);
+          box-shadow: 0 6px 24px rgba(99, 102, 241, 0.45);
+        }
+
+        &:active {
+          transform: translateY(0) scale(0.98);
+        }
+
+        span {
+          font-size: 14px;
+          font-weight: 500;
+        }
       }
     }
 
@@ -1009,17 +1130,60 @@ watch(
         color: rgb(31, 32, 34);
         font-size: 16px;
 
-        .btn-ai {
-          background-color: rgba(138, 43, 226, 0.1);
-          border: 1px solid rgba(138, 43, 226, 0.3);
-          color: rgb(138, 43, 226);
-          transition: all 0.3s;
+        .preview-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        // AI 智能写作按钮 - 更突出的设计
+        .ai-smart-button {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 6px 14px 6px 6px;
+          background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #4F46E5 100%);
+          border-radius: 24px;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 
           &:hover {
-            background-color: rgb(138, 43, 226);
-            color: rgb(255, 255, 255);
-            border-color: rgb(138, 43, 226);
-            transform: scale(1.05);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+          }
+
+          &:active {
+            transform: translateY(0);
+          }
+
+          .ai-icon-wrapper {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            color: white;
+          }
+
+          .ai-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+
+            .ai-title {
+              font-size: 13px;
+              font-weight: 600;
+              color: white;
+            }
+
+            .ai-subtitle {
+              font-size: 10px;
+              font-weight: 400;
+              color: rgba(255, 255, 255, 0.8);
+            }
           }
         }
       }
@@ -1238,5 +1402,17 @@ watch(
       opacity: 1;
     }
   }
+}
+
+// 淡入淡出动画
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 </style>

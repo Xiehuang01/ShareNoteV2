@@ -300,6 +300,62 @@ router.delete('/deleteFile/:fileId', checkAuth, async (req, res) => {
     }
 })
 
+// 删除 Markdown 中的图片接口
+router.delete('/deleteImage/:imageName', checkAuth, async (req, res) => {
+  const { imageName } = req.params
+  const userId = req.userId
+
+  if (!imageName) {
+    return res.status(400).json({ status: 'fail', message: '缺少图片名称参数' })
+  }
+
+  try {
+    console.log('删除图片请求:', imageName, '用户ID:', userId)
+    
+    // 查询图片信息，确保图片属于当前用户
+    const [imageRows] = await pool.execute(
+      'SELECT * FROM markdownFiles WHERE imgPath LIKE ? AND uploadUserId = ?',
+      [`%${imageName}`, userId]
+    )
+
+    if (imageRows.length === 0) {
+      console.log('图片不存在或无权限删除:', imageName)
+      return res.status(404).json({ status: 'fail', message: '图片不存在或无权限删除' })
+    }
+
+    const imageInfo = imageRows[0]
+    const imgFileName = path.basename(imageInfo.imgPath)
+    const imgFilePath = path.join(uploadPath, imgFileName)
+
+    // 从数据库删除图片记录
+    const [deleteResult] = await pool.execute(
+      'DELETE FROM markdownFiles WHERE imgPath LIKE ? AND uploadUserId = ?',
+      [`%${imageName}`, userId]
+    )
+
+    if (deleteResult.affectedRows === 0) {
+      return res.status(500).json({ status: 'fail', message: '删除数据库记录失败' })
+    }
+
+    // 删除物理文件
+    if (fs.existsSync(imgFilePath)) {
+      fs.unlinkSync(imgFilePath)
+      console.log('已删除图片文件:', imgFileName)
+    } else {
+      console.log('图片文件不存在:', imgFilePath)
+    }
+
+    res.json({
+      status: 'success',
+      message: '图片删除成功'
+    })
+
+  } catch (err) {
+    console.error('删除图片错误:', err)
+    res.status(500).json({ status: 'fail', message: '服务器错误' })
+  }
+})
+
 // 更新文件内容接口
 router.post('/updateFile', checkAuth, async (req, res) => {
   const { fileName, content } = req.body

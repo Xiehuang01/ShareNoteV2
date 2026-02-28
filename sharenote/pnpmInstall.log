@@ -52,3 +52,6 @@ vue的pdf查看工具
 
 16. pnpm install jszip
 JSZip 库来创建 zip 文件
+
+17. pnpm install diff-match-patch
+diff-match-patch库来比较两个字符串的差异
