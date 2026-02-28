@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { callAIStream } from '@/api/ai'
-import { Magic, Loading } from '@element-plus/icons-vue'
+import { MagicStick, Loading } from '@element-plus/icons-vue'
 
 const props = defineProps({
   selectedText: {
@@ -112,7 +112,7 @@ defineExpose({
         <div class="prompt-actions">
           <el-button
             type="primary"
-            :icon="Magic"
+            :icon="MagicStick"
             :loading="isGenerating"
             @click="generate"
           >

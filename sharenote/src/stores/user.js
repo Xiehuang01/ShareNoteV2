@@ -133,6 +133,19 @@ export const useUserStore = defineStore(
       groupMembers.value = []
     }
 
+    // AI 配置
+    const aiConfig = ref(null)
+
+    // 设置 AI 配置
+    const setAiConfig = (config) => {
+      aiConfig.value = config
+    }
+
+    // 清除 AI 配置
+    const clearAiConfig = () => {
+      aiConfig.value = null
+    }
+
     return {
       token,
       setToken,
@@ -158,14 +171,17 @@ export const useUserStore = defineStore(
       clearCurrentMemberId,
       groupMembers,
       setGroupMembers,
-      clearGroupMembers
+      clearGroupMembers,
+      aiConfig,
+      setAiConfig,
+      clearAiConfig
     }
   },
   {
     persist: {
       key: 'sharenote-user',
       storage: localStorage,
-      paths: ['token', 'userInfo', 'userNotesList', 'selectedNote', 'chooseNote', 'currentGroup', 'currentMemberId', 'groupMembers']
+      paths: ['token', 'userInfo', 'userNotesList', 'selectedNote', 'chooseNote', 'currentGroup', 'currentMemberId', 'groupMembers', 'aiConfig']
     }
   }
 )

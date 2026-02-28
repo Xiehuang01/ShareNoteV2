@@ -51,8 +51,24 @@ export const callAI = async (apiKey, model, prompt, selectedText = '') => {
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error?.message || 'AI 调用失败')
+      let errorMessage = 'AI 调用失败'
+      try {
+        const error = await response.json()
+        errorMessage = error.error?.message || error.message || errorMessage
+      } catch (e) {
+        // 无法解析错误信息
+      }
+      
+      // 根据状态码提供更友好的错误提示
+      if (response.status === 401) {
+        errorMessage = 'API Key 无效或已过期，请检查配置'
+      } else if (response.status === 429) {
+        errorMessage = 'API 调用次数超限，请稍后再试'
+      } else if (response.status === 500) {
+        errorMessage = 'AI 服务暂时不可用，请稍后再试'
+      }
+      
+      throw new Error(errorMessage)
     }
 
     const data = await response.json()
@@ -74,6 +90,12 @@ export const callAI = async (apiKey, model, prompt, selectedText = '') => {
  */
 export const callAIStream = async (apiKey, model, prompt, selectedText = '', onChunk) => {
   try {
+    console.log('=== AI 调用信息 ===')
+    console.log('API Key (前10位):', apiKey?.substring(0, 10) + '...')
+    console.log('模型:', model)
+    console.log('提示词:', prompt)
+    console.log('==================')
+    
     const messages = []
     
     if (selectedText) {
@@ -112,8 +134,24 @@ export const callAIStream = async (apiKey, model, prompt, selectedText = '', onC
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error?.message || 'AI 调用失败')
+      let errorMessage = 'AI 调用失败'
+      try {
+        const error = await response.json()
+        errorMessage = error.error?.message || error.message || errorMessage
+      } catch (e) {
+        // 无法解析错误信息
+      }
+      
+      // 根据状态码提供更友好的错误提示
+      if (response.status === 401) {
+        errorMessage = 'API Key 无效或已过期，请检查配置'
+      } else if (response.status === 429) {
+        errorMessage = 'API 调用次数超限，请稍后再试'
+      } else if (response.status === 500) {
+        errorMessage = 'AI 服务暂时不可用，请稍后再试'
+      }
+      
+      throw new Error(errorMessage)
     }
 
     const reader = response.body.getReader()

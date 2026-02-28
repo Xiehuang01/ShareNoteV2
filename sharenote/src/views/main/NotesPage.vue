@@ -24,6 +24,8 @@ import Panzoom from '@panzoom/panzoom'
 import VuePdfEmbed from 'vue-pdf-embed'
 import { useUserStore } from '@/stores/user'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
+import AIAssistant from '@/components/AIAssistant.vue'
+import { MagicStick } from '@element-plus/icons-vue'
 
 // 接收父组件传递的 props
 const props = defineProps({
@@ -233,6 +235,19 @@ const pendingTimeouts = []
 // const triggerDisabledDirectory = () => {
 //   emit('disabledDirectory')
 // }
+
+// 监听编辑模式变化，进入编辑模式时立即更新预览
+watch(
+  () => userStore.isEditMode,
+  (newValue) => {
+    if (newValue && markdownText.value) {
+      // 进入编辑模式时，立即更新预览
+      nextTick(() => {
+        updatePreview(markdownText.value)
+      })
+    }
+  }
+)
 
 // 监听 fileName 的变化，当用户点击不同笔记时重新加载
 watch(
@@ -633,6 +648,29 @@ const activeId = ref(null)
 
 const markdownBodyRef = ref(null)
 const directoryRef = ref(null)
+const aiAssistantRef = ref(null)
+
+// 打开 AI 助手
+const openAIAssistant = () => {
+  if (aiAssistantRef.value) {
+    aiAssistantRef.value.open()
+  }
+}
+
+// 处理 AI 插入文本
+const handleInsertText = (text) => {
+  // 在光标位置插入文本
+  markdownText.value += '\n' + text
+  updatePreview(markdownText.value)
+}
+
+// 处理 AI 替换文本
+const handleReplaceText = (text) => {
+  // 替换整个内容（简化处理）
+  markdownText.value = text
+  updatePreview(markdownText.value)
+}
+
 // 目录的收起和展开
 const toggleDirectoryStatus = (isExpandValue) => {
   console.log('toggleDirectoryStatus 被调用，参数:', isExpandValue)
@@ -732,7 +770,17 @@ watch(
         </div>
         <!-- 右侧预览 -->
         <div class="preview-pane">
-          <div class="preview-header">预览</div>
+          <div class="preview-header">
+            <span>预览</span>
+            <el-button
+              :icon="MagicStick"
+              class="btn-ai"
+              circle
+              size="small"
+              @click="openAIAssistant"
+              title="AI 辅助写作"
+            ></el-button>
+          </div>
           <div
             class="markdown-body preview-content"
             v-html="html"
@@ -830,6 +878,14 @@ watch(
     </div>
     
     <LoadingOverlay v-if="updateLoading" />
+    
+    <!-- AI 助手 -->
+    <AIAssistant
+      ref="aiAssistantRef"
+      :selected-text="''"
+      @insert-text="handleInsertText"
+      @replace-text="handleReplaceText"
+    />
   </div>
 </template>
 
@@ -945,12 +1001,27 @@ watch(
         height: 50px;
         display: flex;
         align-items: center;
+        justify-content: space-between;
         padding: 0 20px;
         border-bottom: 1px solid rgb(215, 221, 227);
         background: rgb(246, 248, 250);
         font-weight: bold;
         color: rgb(31, 32, 34);
         font-size: 16px;
+
+        .btn-ai {
+          background-color: rgba(138, 43, 226, 0.1);
+          border: 1px solid rgba(138, 43, 226, 0.3);
+          color: rgb(138, 43, 226);
+          transition: all 0.3s;
+
+          &:hover {
+            background-color: rgb(138, 43, 226);
+            color: rgb(255, 255, 255);
+            border-color: rgb(138, 43, 226);
+            transform: scale(1.05);
+          }
+        }
       }
 
       .preview-content {

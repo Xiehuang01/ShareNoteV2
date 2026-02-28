@@ -928,8 +928,13 @@ const deleteFile = async () => {
       <!-- 标题 -->
       <div class="title-wrapper">
         <div class="title">
-          <p class="left">{{ clickNotesActivedName }}</p>
-          <div class="right">
+          <!-- 根据路由显示不同的标题 -->
+          <p class="left" v-if="route.path === '/main/settings'">设置</p>
+          <p class="left" v-else-if="route.path === '/main/profile'">我的</p>
+          <p class="left" v-else>{{ clickNotesActivedName }}</p>
+          
+          <!-- 只在主页显示操作按钮（排除设置和个人资料页） -->
+          <div class="right" v-if="route.path !== '/main/settings' && route.path !== '/main/profile'">
             <!-- 打开和关闭目录 -->
             <el-button
               :icon="Memo"

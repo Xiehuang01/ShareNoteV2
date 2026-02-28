@@ -227,8 +227,8 @@ defineExpose({
               <span class="label">创建时间:</span>
               <span>{{ new Date(group.createdTime).toLocaleDateString() }}</span>
             </div>
-          </div>
-        </div>
+    </div>
+  </div>
 
         <!-- 空状态 -->
         <div class="empty-state" v-if="!isLoading && userGroups.length === 0">
@@ -346,8 +346,8 @@ defineExpose({
         .el-slider__button {
           transform: scale(1.2);
           box-shadow: 0 0 10px rgba(54, 211, 153, 0.5);
-        }
       }
+    }
     }
 
     .tip {
@@ -397,7 +397,7 @@ defineExpose({
         
         .group-name {
           color: rgb(54, 211, 153);
-        }
+    }
       }
 
       .group-header {
@@ -422,8 +422,8 @@ defineExpose({
           &:hover {
             background-color: rgb(255, 14, 35);
             color: rgb(255, 255, 255);
-          }
-        }
+    }
+  }
       }
 
       .group-info {
@@ -452,7 +452,7 @@ defineExpose({
       padding: 60px 0;
       text-align: center;
       color: rgb(107, 114, 128);
-    }
+  }
   }
 }
 
