@@ -299,6 +299,61 @@ router.post('/leaveGroup', checkAuth, async (req, res) => {
   }
 })
 
+// 解散小组
+router.post('/disbandGroup', checkAuth, async (req, res) => {
+  const userId = req.userId
+  const { groupId } = req.body
+  
+  if (!groupId) {
+    return res.status(400).json({ status: 'fail', message: '缺少小组ID' })
+  }
+  
+  const connection = await pool.getConnection()
+  
+  try {
+    await connection.beginTransaction()
+    
+    // 检查权限（只有所有者可以解散）
+    const [membership] = await connection.execute(
+      'SELECT role FROM group_members WHERE groupId = ? AND userId = ? AND isActive = 1',
+      [groupId, userId]
+    )
+    
+    if (membership.length === 0 || membership[0].role !== 'owner') {
+      await connection.rollback()
+      return res.status(403).json({ status: 'fail', message: '只有所有者可以解散小组' })
+    }
+    
+    // 软删除小组
+    await connection.execute(
+      'UPDATE groups SET isActive = 0 WHERE groupId = ?',
+      [groupId]
+    )
+    
+    // 移除所有成员（软删除）
+    await connection.execute(
+      'UPDATE group_members SET isActive = 0 WHERE groupId = ?',
+      [groupId]
+    )
+    
+    // 记录活动日志
+    await connection.execute(
+      'INSERT INTO group_activities (groupId, userId, activityType, activityDetail) VALUES (?, ?, ?, ?)',
+      [groupId, userId, 'group_update', JSON.stringify({ action: 'disband' })]
+    )
+    
+    await connection.commit()
+    
+    res.json({ status: 'success', message: '小组已解散' })
+  } catch (error) {
+    await connection.rollback()
+    console.error('解散小组失败:', error)
+    res.status(500).json({ status: 'fail', message: '解散失败' })
+  } finally {
+    connection.release()
+  }
+})
+
 // 获取小组的笔记列表（所有成员的笔记）
 router.get('/getGroupNotes', checkAuth, async (req, res) => {
   const userId = req.userId

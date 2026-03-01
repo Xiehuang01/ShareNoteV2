@@ -167,6 +167,7 @@ const getUserNotesList = async () => {
       selectedFileName.value = firstNote.fileName
       selectedFileType.value = firstNote.fileType
       selectedFileCustomName.value = firstNote.fileCustomName
+      selectedNotePublisherId.value = firstNote.publisherId
 
       // 更新 store
       userStore.setSelectedNote({
@@ -175,6 +176,13 @@ const getUserNotesList = async () => {
         fileType: firstNote.fileType,
         fileCustomName: firstNote.fileCustomName
       })
+      
+      // 检查编辑权限
+      const isMarkdown = isMarkdownFile(firstNote.fileType)
+      if (isMarkdown) {
+        isEditDisabled.value = !canEditNote.value
+      }
+      
       console.log('已选择第一个笔记:', firstNote.fileCustomName)
     } else {
       // 如果没有笔记，显示 welcome.md
@@ -182,6 +190,7 @@ const getUserNotesList = async () => {
       selectedFileName.value = 'welcome.md'
       selectedFileType.value = ''
       selectedFileCustomName.value = ''
+      selectedNotePublisherId.value = null
       userStore.clearSelectedNote()
       console.log('没有笔记，显示 welcome.md')
     }
@@ -390,6 +399,40 @@ const isMarkdownFile = (fileType) => {
 const isEditDisabled = ref(false)
 const isDirectoryDisabled = ref(false)
 
+// 当前选中笔记的发布者ID
+const selectedNotePublisherId = ref(null)
+
+// 检查当前用户是否有编辑权限
+const canEditNote = computed(() => {
+  // 如果没有选中笔记，不能编辑
+  if (!clickNotesActivedId.value || !selectedNotePublisherId.value) {
+    return false
+  }
+  
+  // 如果是笔记的所有者，可以编辑
+  if (selectedNotePublisherId.value === userStore.userInfo.userid) {
+    return true
+  }
+  
+  // TODO: 如果是管理员，也可以编辑（需要后端提供用户角色信息）
+  // if (userStore.userInfo.role === 'admin') {
+  //   return true
+  // }
+  
+  return false
+})
+
+// 检查当前用户是否可以上传笔记（只能在自己的笔记列表或小组中上传）
+const canUploadNote = computed(() => {
+  // 如果在查看其他成员的笔记列表，不能上传
+  if (userStore.currentMemberId && userStore.currentMemberId !== userStore.userInfo.userid) {
+    return false
+  }
+  
+  // 其他情况可以上传（自己的笔记列表或小组笔记列表）
+  return true
+})
+
 // 处理编辑按钮点击
 const handleEditClick = () => {
   // 检查是否有选中的笔记
@@ -397,6 +440,13 @@ const handleEditClick = () => {
     ElMessage.warning('请先选中一个笔记')
     return
   }
+  
+  // 检查是否有编辑权限
+  if (!canEditNote.value) {
+    ElMessage.warning('您没有权限编辑此笔记')
+    return
+  }
+  
   // 检查是否为 Markdown 文件
   const isMarkdown = isMarkdownFile(selectedFileType.value)
   if (!isMarkdown) {
@@ -419,6 +469,15 @@ const handleToggleEdit = (editing) => {
   userStore.setEditMode(editing)
 }
 
+// 处理上传按钮点击
+const handleUploadClick = () => {
+  if (!canUploadNote.value) {
+    ElMessage.warning('您没有权限在此列表上传笔记')
+    return
+  }
+  AddNotesRef.value.turnonAddNote()
+}
+
 // 搜索输入框
 const input2 = ref('')
 
@@ -436,11 +495,12 @@ const filteredNotesList = computed(() => {
 })
 
 // 点击对应的笔记
-const clickNotes = (fileId, fileName, fileType, fileCustomName) => {
+const clickNotes = (fileId, fileName, fileType, fileCustomName, publisherId) => {
   clickNotesActivedId.value = fileId
   selectedFileName.value = fileName
   selectedFileType.value = fileType
   selectedFileCustomName.value = fileCustomName
+  selectedNotePublisherId.value = publisherId
 
   // 检查是否为非 Markdown 文件
   const isMarkdown = isMarkdownFile(fileType)
@@ -451,7 +511,11 @@ const clickNotes = (fileId, fileName, fileType, fileCustomName) => {
     '类型:',
     fileType,
     '是否为Markdown:',
-    isMarkdown
+    isMarkdown,
+    '发布者ID:',
+    publisherId,
+    '当前用户ID:',
+    userStore.userInfo.userid
   )
 
   if (!isMarkdown) {
@@ -462,8 +526,8 @@ const clickNotes = (fileId, fileName, fileType, fileCustomName) => {
     console.log('强制关闭目录 - 非Markdown文件')
     isExpandDirectory.value = false
   } else {
-    // Markdown 文件：启用所有按钮，恢复目录显示
-    isEditDisabled.value = false
+    // Markdown 文件：根据权限决定是否禁用编辑按钮
+    isEditDisabled.value = !canEditNote.value
     isDirectoryDisabled.value = false
     // 如果目录是关闭状态，重新打开它
     if (!isExpandDirectory.value) {
@@ -696,6 +760,12 @@ const deleteFile = async () => {
     return
   }
 
+  // 检查是否有删除权限
+  if (!canEditNote.value) {
+    ElMessage.warning('您没有权限删除此笔记')
+    return
+  }
+
   try {
     // 显示确认对话框
     await ElMessageBox.confirm(
@@ -849,13 +919,14 @@ const deleteFile = async () => {
               <el-button
                 :icon="Plus"
                 color="#13ba81"
+                :disabled="!canUploadNote"
                 style="
                   letter-spacing: 3px;
                   font-weight: bold;
                   width: 100%;
                   margin-top: 10px;
                 "
-                @click="AddNotesRef.turnonAddNote()"
+                @click="handleUploadClick"
                 >上传笔记</el-button
               >
             </div>
@@ -880,7 +951,8 @@ const deleteFile = async () => {
                       item.fileId,
                       item.fileName,
                       item.fileType,
-                      item.fileCustomName
+                      item.fileCustomName,
+                      item.publisherId
                     )
                   "
                 >
@@ -957,6 +1029,7 @@ const deleteFile = async () => {
               :icon="Delete"
               class="btn-delete"
               circle
+              :disabled="!canEditNote"
               style="
                 width: 40px;
                 background-color: rgba(255, 14, 35, 0.2);
@@ -1559,6 +1632,16 @@ const deleteFile = async () => {
           .btn-delete:hover {
             color: rgb(3, 5, 20) !important;
             background-color: rgb(255, 14, 35) !important;
+          }
+          .btn-delete:disabled {
+            opacity: 0.5 !important;
+            cursor: not-allowed !important;
+            background-color: rgba(255, 14, 35, 0.35) !important;
+            color: rgba(255, 14, 35, 0.5) !important;
+          }
+          .btn-delete:disabled:hover {
+            color: rgba(255, 14, 35, 0.5) !important;
+            background-color: rgba(255, 14, 35, 0.1) !important;
           }
           .btn-edit:hover {
             color: rgb(3, 5, 20) !important;

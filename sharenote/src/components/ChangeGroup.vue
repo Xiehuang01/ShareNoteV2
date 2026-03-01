@@ -1,11 +1,17 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, User, Delete } from '@element-plus/icons-vue'
+import { Plus, User, Delete, Setting } from '@element-plus/icons-vue'
 import { 
   groupGetUserGroupsServer, 
   groupCreateGroupServer,
-  groupLeaveGroupServer 
+  groupLeaveGroupServer,
+  groupGetMembersServer,
+  groupUpdateGroupNameServer,
+  groupUpdateMemberRoleServer,
+  groupRemoveMemberServer,
+  groupTransferOwnershipServer,
+  groupDisbandGroupServer
 } from '@/api/group'
 import LoadingOverlay from './LoadingOverlay.vue'
 
@@ -20,6 +26,13 @@ const createForm = ref({
   groupName: '',
   maxMembers: 5
 })
+
+// 管理小组对话框
+const manageDialogVisible = ref(false)
+const currentManageGroup = ref(null)
+const groupMembers = ref([])
+const editingGroupName = ref(false)
+const newGroupName = ref('')
 
 const emit = defineEmits(['group-switched', 'group-created'])
 
@@ -93,10 +106,18 @@ const switchGroup = (group) => {
 }
 
 // 退出小组
-const leaveGroup = async (groupId, groupName) => {
+const leaveGroup = async (group, event) => {
+  event.stopPropagation()
+  
+  // 如果是创建者，提供选择：转移所有权或解散小组
+  if (group.role === 'owner') {
+    await showOwnerLeaveOptions(group)
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(
-      `确定要退出小组 "${groupName}" 吗？`,
+      `确定要退出小组 "${group.groupName}" 吗？`,
       '退出小组',
       {
         confirmButtonText: '确定',
@@ -105,7 +126,7 @@ const leaveGroup = async (groupId, groupName) => {
       }
     )
 
-    const res = await groupLeaveGroupServer(groupId)
+    const res = await groupLeaveGroupServer({ groupId: group.groupId })
     if (res.status === 'success') {
       ElMessage.success('已退出小组')
       await loadUserGroups()
@@ -116,6 +137,261 @@ const leaveGroup = async (groupId, groupName) => {
     if (error === 'cancel') return
     console.error('退出小组失败:', error)
     ElMessage.error(error.response?.data?.message || '退出失败，请重试')
+  }
+}
+
+// 显示创建者退出选项
+const showOwnerLeaveOptions = async (group) => {
+  try {
+    const { value: action } = await ElMessageBox.confirm(
+      '作为小组创建者，您可以选择：',
+      '退出小组',
+      {
+        distinguishCancelAndClose: true,
+        confirmButtonText: '转移所有权后退出',
+        cancelButtonText: '解散小组',
+        type: 'warning',
+        center: true
+      }
+    )
+    
+    // 用户点击确定 - 转移所有权
+    await showTransferOwnershipDialog(group)
+  } catch (action) {
+    if (action === 'cancel') {
+      // 用户点击取消 - 解散小组
+      await disbandGroup(group)
+    }
+    // 用户点击关闭按钮 - 什么都不做
+  }
+}
+
+// 显示转移所有权对话框
+const showTransferOwnershipDialog = async (group) => {
+  try {
+    // 获取小组成员
+    const res = await groupGetMembersServer(group.groupId)
+    if (res.status !== 'success') {
+      ElMessage.error('获取成员列表失败')
+      return
+    }
+    
+    // 过滤掉自己
+    const members = res.data.filter(m => m.id !== group.creatorId)
+    
+    if (members.length === 0) {
+      ElMessage.warning('小组中没有其他成员，无法转移所有权')
+      return
+    }
+    
+    // 创建选择成员的对话框
+    const { value: newOwnerId } = await ElMessageBox.prompt(
+      `作为小组创建者，退出前需要选择一个新的所有者。请输入新所有者的用户ID：\n\n可选成员：\n${members.map(m => `${m.username} (ID: ${m.id})`).join('\n')}`,
+      '转移所有权',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputPattern: /^\d+$/,
+        inputErrorMessage: '请输入有效的用户ID'
+      }
+    )
+    
+    const newOwner = members.find(m => m.id === parseInt(newOwnerId))
+    if (!newOwner) {
+      ElMessage.error('选择的用户不在小组中')
+      return
+    }
+    
+    // 转移所有权并退出
+    const transferRes = await groupTransferOwnershipServer({
+      groupId: group.groupId,
+      newOwnerId: parseInt(newOwnerId)
+    })
+    
+    if (transferRes.status === 'success') {
+      ElMessage.success('已转移所有权并退出小组')
+      await loadUserGroups()
+    } else {
+      ElMessage.error(transferRes.message || '转移失败')
+    }
+  } catch (error) {
+    if (error === 'cancel') return
+    console.error('转移所有权失败:', error)
+    ElMessage.error(error.response?.data?.message || '操作失败')
+  }
+}
+
+// 打开管理小组对话框
+const openManageDialog = async (group, event) => {
+  event.stopPropagation()
+  
+  currentManageGroup.value = group
+  newGroupName.value = group.groupName
+  editingGroupName.value = false
+  
+  // 加载小组成员
+  try {
+    const res = await groupGetMembersServer(group.groupId)
+    if (res.status === 'success') {
+      groupMembers.value = res.data
+      manageDialogVisible.value = true
+    } else {
+      ElMessage.error('获取成员列表失败')
+    }
+  } catch (error) {
+    console.error('获取成员列表失败:', error)
+    ElMessage.error('获取成员列表失败')
+  }
+}
+
+// 保存小组名称
+const saveGroupName = async () => {
+  if (!newGroupName.value.trim()) {
+    ElMessage.warning('小组名称不能为空')
+    return
+  }
+  
+  try {
+    const res = await groupUpdateGroupNameServer({
+      groupId: currentManageGroup.value.groupId,
+      groupName: newGroupName.value.trim()
+    })
+    
+    if (res.status === 'success') {
+      ElMessage.success('修改成功')
+      currentManageGroup.value.groupName = newGroupName.value.trim()
+      editingGroupName.value = false
+      await loadUserGroups()
+    } else {
+      ElMessage.error(res.message || '修改失败')
+    }
+  } catch (error) {
+    console.error('修改小组名称失败:', error)
+    ElMessage.error(error.response?.data?.message || '修改失败')
+  }
+}
+
+// 更新成员角色
+const updateMemberRole = async (member, newRole) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将 ${member.username} 的角色改为 ${newRole === 'admin' ? '管理员' : '普通成员'} 吗？`,
+      '修改角色',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const res = await groupUpdateMemberRoleServer({
+      groupId: currentManageGroup.value.groupId,
+      userId: member.id,
+      role: newRole
+    })
+    
+    if (res.status === 'success') {
+      ElMessage.success('修改成功')
+      member.role = newRole
+    } else {
+      ElMessage.error(res.message || '修改失败')
+    }
+  } catch (error) {
+    if (error === 'cancel') return
+    console.error('修改角色失败:', error)
+    ElMessage.error(error.response?.data?.message || '修改失败')
+  }
+}
+
+// 移除成员
+const removeMember = async (member) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将 ${member.username} 移出小组吗？`,
+      '移除成员',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const res = await groupRemoveMemberServer({
+      groupId: currentManageGroup.value.groupId,
+      userId: member.id
+    })
+    
+    if (res.status === 'success') {
+      ElMessage.success('移除成功')
+      groupMembers.value = groupMembers.value.filter(m => m.id !== member.id)
+    } else {
+      ElMessage.error(res.message || '移除失败')
+    }
+  } catch (error) {
+    if (error === 'cancel') return
+    console.error('移除成员失败:', error)
+    ElMessage.error(error.response?.data?.message || '移除失败')
+  }
+}
+
+// 转移所有权（在管理对话框中）
+const transferOwnership = async (member) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将小组所有权转移给 ${member.username} 吗？转移后您将成为普通成员。`,
+      '转移所有权',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const res = await groupTransferOwnershipServer({
+      groupId: currentManageGroup.value.groupId,
+      newOwnerId: member.id
+    })
+    
+    if (res.status === 'success') {
+      ElMessage.success('转移成功')
+      manageDialogVisible.value = false
+      await loadUserGroups()
+    } else {
+      ElMessage.error(res.message || '转移失败')
+    }
+  } catch (error) {
+    if (error === 'cancel') return
+    console.error('转移所有权失败:', error)
+    ElMessage.error(error.response?.data?.message || '转移失败')
+  }
+}
+
+// 解散小组
+const disbandGroup = async (group) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要解散小组 "${group.groupName}" 吗？解散后所有成员将被移除，此操作不可恢复！`,
+      '解散小组',
+      {
+        confirmButtonText: '确定解散',
+        cancelButtonText: '取消',
+        type: 'error',
+        center: true
+      }
+    )
+    
+    const res = await groupDisbandGroupServer(group.groupId)
+    
+    if (res.status === 'success') {
+      ElMessage.success('小组已解散')
+      await loadUserGroups()
+    } else {
+      ElMessage.error(res.message || '解散失败')
+    }
+  } catch (error) {
+    if (error === 'cancel') return
+    console.error('解散小组失败:', error)
+    ElMessage.error(error.response?.data?.message || '解散失败')
   }
 }
 
@@ -207,16 +483,6 @@ defineExpose({
                 管理员
               </el-tag>
             </div>
-            <el-button
-              v-if="group.role !== 'owner'"
-              :icon="Delete"
-              type="danger"
-              size="small"
-              text
-              @click.stop="leaveGroup(group.groupId, group.groupName)"
-            >
-              退出
-            </el-button>
           </div>
           <div class="group-info">
             <div class="info-item">
@@ -227,8 +493,27 @@ defineExpose({
               <span class="label">创建时间:</span>
               <span>{{ new Date(group.createdTime).toLocaleDateString() }}</span>
             </div>
-    </div>
-  </div>
+          </div>
+          <div class="group-actions">
+            <el-button
+              v-if="group.role === 'owner' || group.role === 'admin'"
+              :icon="Setting"
+              type="primary"
+              size="small"
+              @click="openManageDialog(group, $event)"
+            >
+              管理小组
+            </el-button>
+            <el-button
+              :icon="Delete"
+              type="danger"
+              size="small"
+              @click="leaveGroup(group, $event)"
+            >
+              {{ group.role === 'owner' ? '退出/解散' : '退出小组' }}
+            </el-button>
+          </div>
+        </div>
 
         <!-- 空状态 -->
         <div class="empty-state" v-if="!isLoading && userGroups.length === 0">
@@ -237,6 +522,122 @@ defineExpose({
       </div>
     </div>
   </el-dialog>
+
+  <!-- 管理小组对话框 -->
+  <el-dialog
+    v-model="manageDialogVisible"
+    :title="`管理小组 - ${currentManageGroup?.groupName}`"
+    width="700px"
+    :close-on-click-modal="false"
+    align-center
+  >
+    <div class="manage-container" v-if="currentManageGroup">
+      <!-- 修改小组名称 -->
+      <div class="manage-section">
+        <div class="section-title">小组名称</div>
+        <div class="name-edit-area">
+          <el-input
+            v-if="editingGroupName"
+            v-model="newGroupName"
+            placeholder="请输入新的小组名称"
+            maxlength="50"
+            show-word-limit
+            style="flex: 1"
+          />
+          <span v-else class="current-name">{{ currentManageGroup.groupName }}</span>
+          <el-button
+            v-if="!editingGroupName"
+            type="primary"
+            size="small"
+            @click="editingGroupName = true"
+          >
+            修改
+          </el-button>
+          <template v-else>
+            <el-button type="success" size="small" @click="saveGroupName">
+              保存
+            </el-button>
+            <el-button size="small" @click="editingGroupName = false">
+              取消
+            </el-button>
+          </template>
+        </div>
+      </div>
+
+      <!-- 成员管理 -->
+      <div class="manage-section">
+        <div class="section-title">成员管理 ({{ groupMembers.length }}/{{ currentManageGroup.maxMembers }})</div>
+        <div class="members-list">
+          <div
+            v-for="member in groupMembers"
+            :key="member.id"
+            class="member-item"
+          >
+            <div class="member-info">
+              <el-avatar :src="member.avatarpath" :size="40">
+                {{ member.username.charAt(0) }}
+              </el-avatar>
+              <div class="member-details">
+                <div class="member-name">{{ member.username }}</div>
+                <div class="member-email">{{ member.email }}</div>
+              </div>
+              <el-tag
+                :type="member.role === 'owner' ? 'warning' : member.role === 'admin' ? 'success' : 'info'"
+                size="small"
+              >
+                {{ member.role === 'owner' ? '所有者' : member.role === 'admin' ? '管理员' : '成员' }}
+              </el-tag>
+            </div>
+            <div class="member-actions" v-if="member.role !== 'owner'">
+              <!-- 创建者可以修改角色和转移所有权 -->
+              <template v-if="currentManageGroup.role === 'owner'">
+                <el-button
+                  v-if="member.role === 'member'"
+                  type="success"
+                  size="small"
+                  @click="updateMemberRole(member, 'admin')"
+                >
+                  设为管理员
+                </el-button>
+                <el-button
+                  v-else-if="member.role === 'admin'"
+                  type="warning"
+                  size="small"
+                  @click="updateMemberRole(member, 'member')"
+                >
+                  取消管理员
+                </el-button>
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="transferOwnership(member)"
+                >
+                  转移群主
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  @click="removeMember(member)"
+                >
+                  移除
+                </el-button>
+              </template>
+              <!-- 管理员只能踢人 -->
+              <template v-else-if="currentManageGroup.role === 'admin'">
+                <el-button
+                  type="danger"
+                  size="small"
+                  @click="removeMember(member)"
+                >
+                  移除
+                </el-button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </el-dialog>  
 </template>
 
 <style lang="scss">
@@ -413,17 +814,6 @@ defineExpose({
           display: flex;
           align-items: center;
         }
-
-        .el-button {
-          background-color: transparent;
-          border: 1px solid rgb(255, 14, 35);
-          color: rgb(255, 14, 35);
-
-          &:hover {
-            background-color: rgb(255, 14, 35);
-            color: rgb(255, 255, 255);
-    }
-  }
       }
 
       .group-info {
@@ -431,6 +821,7 @@ defineExpose({
         gap: 20px;
         font-size: 14px;
         color: rgb(107, 114, 128);
+        margin-bottom: 12px;
 
         .info-item {
           display: flex;
@@ -443,6 +834,38 @@ defineExpose({
 
           .label {
             font-weight: 500;
+          }
+        }
+      }
+
+      .group-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        padding-top: 8px;
+        border-top: 1px solid rgb(20, 31, 48);
+
+        .el-button {
+          &.el-button--primary {
+            background-color: rgba(54, 211, 153, 0.2);
+            border: 1px solid rgb(54, 211, 153);
+            color: rgb(54, 211, 153);
+
+            &:hover {
+              background-color: rgb(54, 211, 153);
+              color: rgb(3, 6, 23);
+            }
+          }
+
+          &.el-button--danger {
+            background-color: transparent;
+            border: 1px solid rgb(255, 14, 35);
+            color: rgb(255, 14, 35);
+
+            &:hover {
+              background-color: rgb(255, 14, 35);
+              color: rgb(255, 255, 255);
+            }
           }
         }
       }
@@ -532,6 +955,179 @@ color: rgb(107, 114, 128);
     background-color: rgba(54, 211, 153, 0.2);
     border-color: rgb(54, 211, 153);
     color: rgb(54, 211, 153);
+  }
+}
+
+// 管理小组对话框样式
+.manage-container {
+  .manage-section {
+    margin-bottom: 30px;
+
+    .section-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: rgb(255, 255, 255);
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgb(20, 31, 48);
+    }
+
+    .name-edit-area {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+
+      .current-name {
+        flex: 1;
+        font-size: 16px;
+        color: rgb(255, 255, 255);
+      }
+
+      :deep(.el-input__wrapper) {
+        background-color: rgb(3, 6, 23);
+        box-shadow: 0 0 0 1px rgb(25, 35, 53);
+      }
+
+      :deep(.el-input__wrapper.is-focus) {
+        box-shadow: 0 0 0 1px rgb(54, 211, 153);
+      }
+
+      :deep(.el-input__inner) {
+        color: rgb(255, 255, 255);
+      }
+
+      .el-button {
+        &.el-button--primary {
+          background-color: rgba(54, 211, 153, 0.2);
+          border: 1px solid rgb(54, 211, 153);
+          color: rgb(54, 211, 153);
+
+          &:hover {
+            background-color: rgb(54, 211, 153);
+            color: rgb(3, 6, 23);
+          }
+        }
+
+        &.el-button--success {
+          background-color: rgba(54, 211, 153, 0.2);
+          border: 1px solid rgb(54, 211, 153);
+          color: rgb(54, 211, 153);
+
+          &:hover {
+            background-color: rgb(54, 211, 153);
+            color: rgb(3, 6, 23);
+          }
+        }
+      }
+    }
+
+    .members-list {
+      max-height: 400px;
+      overflow-y: auto;
+
+      .member-item {
+        padding: 15px;
+        margin-bottom: 10px;
+        background-color: rgb(8, 15, 32);
+        border-radius: 8px;
+        border: 1px solid rgb(20, 31, 48);
+        transition: all 0.3s;
+
+        &:hover {
+          background-color: rgb(13, 24, 50);
+          border-color: rgb(54, 211, 153);
+        }
+
+        .member-info {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          margin-bottom: 10px;
+
+          .member-details {
+            flex: 1;
+
+            .member-name {
+              font-size: 15px;
+              font-weight: bold;
+              color: rgb(255, 255, 255);
+              margin-bottom: 4px;
+            }
+
+            .member-email {
+              font-size: 13px;
+              color: rgb(107, 114, 128);
+            }
+          }
+        }
+
+        .member-actions {
+          display: flex;
+          gap: 8px;
+          justify-content: flex-end;
+          flex-wrap: wrap;
+
+          .el-button {
+            &.el-button--success {
+              background-color: rgba(54, 211, 153, 0.2);
+              border: 1px solid rgb(54, 211, 153);
+              color: rgb(54, 211, 153);
+
+              &:hover {
+                background-color: rgb(54, 211, 153);
+                color: rgb(3, 6, 23);
+              }
+            }
+
+            &.el-button--warning {
+              background-color: rgba(255, 193, 7, 0.2);
+              border: 1px solid rgb(255, 193, 7);
+              color: rgb(255, 193, 7);
+
+              &:hover {
+                background-color: rgb(255, 193, 7);
+                color: rgb(3, 6, 23);
+              }
+            }
+
+            &.el-button--primary {
+              background-color: rgba(59, 130, 246, 0.2);
+              border: 1px solid rgb(59, 130, 246);
+              color: rgb(59, 130, 246);
+
+              &:hover {
+                background-color: rgb(59, 130, 246);
+                color: rgb(255, 255, 255);
+              }
+            }
+
+            &.el-button--danger {
+              background-color: rgba(255, 14, 35, 0.2);
+              border: 1px solid rgb(255, 14, 35);
+              color: rgb(255, 14, 35);
+
+              &:hover {
+                background-color: rgb(255, 14, 35);
+                color: rgb(255, 255, 255);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .members-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .members-list::-webkit-scrollbar-thumb {
+      background-color: rgba(54, 211, 153, 0.3);
+      border-radius: 3px;
+    }
+
+    .members-list::-webkit-scrollbar-track {
+      background-color: transparent;
+    }
   }
 }
 </style>
