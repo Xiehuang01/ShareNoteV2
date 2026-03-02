@@ -2,7 +2,24 @@ import express from 'express'
 import { pool } from '../database/db.js'
 import jwt from 'jsonwebtoken' // 生成token
 import bcrypt from 'bcryptjs' // 自动加密密码
+import rateLimit from 'express-rate-limit'
+import dotenv from 'dotenv'
+
+// 加载环境变量
+dotenv.config()
+
 const router = express.Router()
+const SECRET_KEY = process.env.JWT_SECRET || 'default-secret-key-please-change'
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
+
+// 登录频率限制
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15分钟
+    max: 5, // 最多5次尝试
+    message: { status: 'fail', message: '登录尝试次数过多，请15分钟后再试' },
+    standardHeaders: true,
+    legacyHeaders: false,
+})
 
 // 路由测试接口
 router.get('/logintry', (req, res) => {
@@ -21,10 +38,20 @@ router.get('/mysqltry' , async (req, res) => {
     
 })
 
-// 登录接口
-router.post('/loginin', async (req, res) => {
+// 登录接口 - 添加频率限制
+router.post('/loginin', loginLimiter, async (req, res) => {
     const {username, password} = req.body
-    console.log(`/loginin: ${username},${password}`)
+    console.log(`/loginin: ${username}`)
+    
+    // 输入验证
+    if (!username || !password) {
+        return res.status(400).json({ message: '用户名和密码不能为空' })
+    }
+    
+    if (username.length > 50 || password.length > 100) {
+        return res.status(400).json({ message: '用户名或密码长度超出限制' })
+    }
+    
     try{
         const [rows] = await pool.execute(
             'select id, username, password from users where username = ?' ,
@@ -43,27 +70,51 @@ router.post('/loginin', async (req, res) => {
             return res.status(401).json({message: '密码不一致'})
         }
         // 密码一致
-        // 生成token
-        const SECRET_KEY = 'aqgy1213812138'
+        // 生成token - 添加过期时间
         const id = rows[0].id
         const newToken = jwt.sign(
             {id},
-            SECRET_KEY
+            SECRET_KEY,
+            { expiresIn: JWT_EXPIRES_IN }
         )
         // 发送给前端
          res.json({ message: '登录成功', status: 'success', token: newToken})
     }catch(err){
        // 500--服务器内部错误
-       // error: err.message
+       console.error('登录错误:', err)
        res.status(500).json({ message: '服务器错误' }) 
     }
 })
 
-// 注册接口
+// 注册接口 - 添加输入验证
 router.post('/loginup', async (req, res)=> {
     // 获取用户输入的参数
     const {username, password, email} = req.body
-    console.log(`/loginup: ${username}, ${password}, ${email}`)
+    console.log(`/loginup: ${username}, ${email}`)
+    
+    // 输入验证
+    if (!username || !password || !email) {
+        return res.status(400).json({ message: '用户名、密码和邮箱不能为空' })
+    }
+    
+    if (username.length < 3 || username.length > 50) {
+        return res.status(400).json({ message: '用户名长度必须在3-50个字符之间' })
+    }
+    
+    if (password.length < 6 || password.length > 100) {
+        return res.status(400).json({ message: '密码长度必须在6-100个字符之间' })
+    }
+    
+    if (email.length > 100) {
+        return res.status(400).json({ message: '邮箱长度不能超过100个字符' })
+    }
+    
+    // 邮箱格式验证
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: '邮箱格式不正确' })
+    }
+    
     // 添加用户
     try {
         // 1. 判断用户是否存在
@@ -97,6 +148,7 @@ router.post('/loginup', async (req, res)=> {
                 res.status(401).json({ message: '服务器未响应' })
         } 
     } catch (error) {
+        console.error('注册错误:', error)
         res.status(500).json({ message: '服务器错误' })
     }
 

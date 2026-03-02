@@ -1,2 +1,50 @@
-node_modules
-dist
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 依赖
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 上传文件（根据需要调整）
+upload/files/*
+upload/avatar/*
+upload/markdownImg/*
+!upload/files/.gitkeep
+!upload/avatar/.gitkeep
+!upload/markdownImg/.gitkeep
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试
+coverage/
+.nyc_output/
+
+# 构建输出
+dist/
+build/
+
+# 其他
+.cache/

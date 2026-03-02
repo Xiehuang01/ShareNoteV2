@@ -1,5 +1,11 @@
 import jwt from 'jsonwebtoken'
-const SECRET_KEY = 'aqgy1213812138'
+import dotenv from 'dotenv'
+
+// 加载环境变量
+dotenv.config()
+
+const SECRET_KEY = process.env.JWT_SECRET || 'default-secret-key-please-change'
+
 export const checkAuth = (req, res, next) => {
     const token = req.headers['authorization']
     if(!token){
@@ -11,12 +17,10 @@ export const checkAuth = (req, res, next) => {
         // 把解析出来的userid存储到req中
         req.userId = userid
         next()
-    }catch{
+    }catch(error){
         return res.status(401).json({
             status: 'fail',
             message: 'token无效或已过期，请重新登录'
         })
     }
-
-    
 }

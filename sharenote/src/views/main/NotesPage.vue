@@ -185,7 +185,7 @@ const saveEdit = async () => {
         await Promise.all(deletePromises)
         ElMessage.success(`保存成功，已删除 ${deletedImages.length} 张未使用的图片`)
       } else {
-        ElMessage.success('保存成功')
+      ElMessage.success('保存成功')
       }
       
       updateLoading.value = false
@@ -448,10 +448,10 @@ const loadMarkdownFile = async () => {
     
     // 高亮代码块
     document.querySelectorAll('.markdown-body pre code, .preview-content pre code').forEach((block) => {
-      block.classList.add('hljs')
-      hljs.highlightElement(block)
-    })
-    addCopyButtonToCodeBlocks()
+        block.classList.add('hljs')
+        hljs.highlightElement(block)
+      })
+      addCopyButtonToCodeBlocks()
     
     // 4. 确保目录状态正确（在内容加载完成后）
     await nextTick()

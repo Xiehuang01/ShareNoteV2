@@ -30,3 +30,8 @@ axios请求访问其他网络资源
 
 11. pnpm install sharp
 图片处理工具
+
+12. npm install dotenv express-rate-limit helme
+环境变量配置
+请求频率限制
+安全响应头

@@ -2,13 +2,35 @@ import express from 'express'
 import redisClient from '../utils/redis.js'
 import transporter from '../utils/nodemailer.js'
 import { pool } from '../database/db.js'
+import rateLimit from 'express-rate-limit'
 
 const router = express.Router()
 
-router.post('/sendemailcode', async (req, res) => {
+// 邮件发送频率限制
+const emailLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1分钟
+    max: 1, // 最多1次
+    message: { status: 'fail', message: '发送验证码过于频繁，请1分钟后再试' },
+    standardHeaders: true,
+    legacyHeaders: false,
+})
+
+router.post('/sendemailcode', emailLimiter, async (req, res) => {
     const { username, email } = req.body
-    if(!email)
+    
+    // 输入验证
+    if(!email) {
         return res.status(400).json( { message: '邮箱不能为空'} )
+    }
+    
+    if (email.length > 100) {
+        return res.status(400).json({ message: '邮箱长度不能超过100个字符' })
+    }
+    
+    if (username && username.length > 50) {
+        return res.status(400).json({ message: '用户名长度不能超过50个字符' })
+    }
+    
     // 验证用户名和邮箱
     // 1. 判断用户是否存在
     const [isExistUsername] = await pool.execute(
@@ -69,7 +91,7 @@ router.post('/sendemailcode', async (req, res) => {
         console.log('读取的 code:', codeGet)
         res.json({ message: '验证码发送成功!', status: 'success'})
       } catch (err) {
-        console.error(err)
+        console.error('发送邮件错误:', err)
         res.status(500).json({ message: '发送失败，请稍后重试' })
       }
     }
@@ -101,9 +123,19 @@ router.post('/verifycode', async (req, res) => {
   }
 })
 
-// 发送更改密码的验证码
-router.post('/sendchangepasswordcode', async (req, res) => {
+// 发送更改密码的验证码 - 添加频率限制
+router.post('/sendchangepasswordcode', emailLimiter, async (req, res) => {
   const {email, usernameFound} = req.body
+  
+  // 输入验证
+  if (!email || !usernameFound) {
+    return res.status(400).json({ message: '邮箱和用户名不能为空' })
+  }
+  
+  if (email.length > 100 || usernameFound.length > 50) {
+    return res.status(400).json({ message: '输入长度超出限制' })
+  }
+  
   // 生成验证码
   const code = Math.floor(100000 + Math.random() * 900000).toString()
   // 将验证码存入redis中
@@ -145,6 +177,7 @@ router.post('/sendchangepasswordcode', async (req, res) => {
     console.log(`emailChangePassword:${email}: ${codeSend}`)
     return res.json({ message: '验证码已发送', status: 'success' })
   }catch(err){
+    console.error('发送密码重置邮件错误:', err)
     return res.status(500).json({ message:'发送验证码失败，服务器未响应' })
   }
 })

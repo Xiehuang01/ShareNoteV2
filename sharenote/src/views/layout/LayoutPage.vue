@@ -1060,16 +1060,16 @@ const deleteFile = async () => {
               "
             ></el-button>
             <!-- 下载 -->
-            <el-button
-              :icon="FolderChecked"
-              color="#16bb82"
+              <el-button
+                :icon="FolderChecked"
+                color="#16bb82"
               @click="downloadFile"
-              style="
-                color: rgb(3, 6, 21);
-                border: none;
-                height: 100%;
-                width: 80px;
-              "
+                style="
+                  color: rgb(3, 6, 21);
+                  border: none;
+                  height: 100%;
+                  width: 80px;
+                "
               >下载</el-button
             >
           </div>
