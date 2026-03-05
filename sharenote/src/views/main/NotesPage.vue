@@ -1326,11 +1326,168 @@ watch(
 // 手机端的适配
 @media (max-width: 768px) {
   .wrapper {
-    .markdown-body {
-      width: 0px;
+    flex-direction: column;
+
+    // 编辑器容器 - 移动端改为上下布局
+    .editor-container {
+      flex-direction: column;
+
+      .editor-pane {
+        width: 100%;
+        height: 50%;
+        border-right: none;
+        border-bottom: 1px solid rgb(215, 221, 227);
+
+        .editor-toolbar {
+          height: 40px;
+          padding: 0 10px;
+
+          .editor-title {
+            font-size: 14px;
+          }
+        }
+
+        .markdown-editor {
+          padding: 10px;
+          font-size: 14px;
+        }
+
+        // AI 悬浮按钮调整位置
+        .ai-float-button {
+          bottom: 10px;
+          right: 10px;
+          padding: 8px 12px;
+          font-size: 12px;
+
+          span {
+            font-size: 12px;
+          }
+        }
+      }
+
+      .preview-pane {
+        width: 100%;
+        height: 50%;
+
+        .preview-header {
+          height: 40px;
+          padding: 0 10px;
+
+          span {
+            font-size: 14px;
+          }
+
+          // AI 智能写作按钮在移动端简化
+          .ai-smart-button {
+            padding: 4px 10px 4px 4px;
+            gap: 6px;
+
+            .ai-icon-wrapper {
+              width: 24px;
+              height: 24px;
+            }
+
+            .ai-text {
+              .ai-title {
+                font-size: 11px;
+              }
+
+              .ai-subtitle {
+                display: none;
+              }
+            }
+          }
+        }
+
+        .preview-content {
+          padding: 10px;
+        }
+      }
     }
+
+    // Markdown 内容区 - 全屏显示
+    .markdown-body {
+      width: 100% !important;
+      padding: 15px;
+
+      // PDF 组件适配
+      .vue-pdf-embed-wrapper {
+        :deep(.vue-pdf-embed__page) {
+          canvas {
+            width: 100% !important;
+            height: auto !important;
+          }
+        }
+      }
+    }
+
+    // 目录 - 移动端改为抽屉式或隐藏
     .directory {
-      width: 100%;
+      position: fixed;
+      right: 0;
+      top: 60px;
+      width: 80% !important;
+      max-width: 300px;
+      height: calc(100% - 60px);
+      z-index: 100;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      background-color: rgb(255, 255, 255);
+      box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+
+      &.mobile-visible {
+        transform: translateX(0);
+      }
+
+      ul {
+        li {
+          font-size: 14px;
+
+          p {
+            margin: 3px 0;
+          }
+        }
+      }
+    }
+
+    // 图片查看器适配
+    .panzoom-wrapper {
+      img {
+        max-width: 100%;
+        max-height: 100%;
+      }
+    }
+  }
+}
+
+// 小屏幕手机适配
+@media (max-width: 480px) {
+  .wrapper {
+    .editor-container {
+      .editor-pane {
+        .editor-toolbar {
+          .editor-actions {
+            gap: 5px;
+
+            .el-button {
+              padding: 6px 12px;
+              font-size: 12px;
+            }
+          }
+        }
+      }
+    }
+
+    .markdown-body {
+      padding: 10px;
+
+      :deep(pre) {
+        .copy-code-button {
+          opacity: 1;
+          padding: 4px 8px;
+          font-size: 12px;
+        }
+      }
     }
   }
 }

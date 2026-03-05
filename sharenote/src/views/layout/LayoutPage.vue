@@ -49,11 +49,21 @@ const isMenuDisabled = ref(false)
 const isActivedClick = ref('Home')
 // 小组成员avatar是否选择（不持久化，仅用于UI显示）
 const isActivedChoice = ref(null)
+// 移动端菜单是否打开
+const isMobileMenuOpen = ref(false)
+// 是否为移动设备
+const isMobile = ref(false)
 
 // 折叠还是收起列表栏
 const toggleFoldStatus = () => {
   // 如果菜单被禁用，不执行任何操作
   if (isMenuDisabled.value) {
+    return
+  }
+
+  // 移动端使用不同的逻辑
+  if (isMobile.value) {
+    isMobileMenuOpen.value = !isMobileMenuOpen.value
     return
   }
 
@@ -69,6 +79,16 @@ const toggleFoldStatus = () => {
     menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
   }
   isExpand.value = !isExpand.value
+}
+
+// 检测是否为移动设备
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
+// 关闭移动端菜单
+const closeMobileMenu = () => {
+  isMobileMenuOpen.value = false
 }
 
 // 是否点击了目录
@@ -269,6 +289,10 @@ const clickGroupMember = async (member, index) => {
 
 // 在组件挂载后加载笔记列表
 onMounted(() => {
+  // 检测是否为移动设备
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+
   // 如果有保存的小组信息，恢复小组成员列表
   if (userStore.currentGroup) {
     loadGroupMembers(userStore.currentGroup.groupId)
@@ -290,8 +314,12 @@ watch(
     if (newPath === '/main/settings') {
       isActivedClick.value = 'Settings'
       isMenuDisabled.value = true
-      // 收起菜单（只在 DOM 元素存在时）
-      if (menu.value && menuSearchUpload.value && isExpand.value) {
+      // 移动端：关闭移动菜单
+      if (isMobile.value) {
+        isMobileMenuOpen.value = false
+      }
+      // PC端：收起菜单（只在 DOM 元素存在时）
+      if (menu.value && menuSearchUpload.value && isExpand.value && !isMobile.value) {
         menu.value.style.width = '0px'
         menuSearchUpload.value.style.display = 'none'
         menu.value.style.borderRight = 'none'
@@ -300,8 +328,12 @@ watch(
     } else if (newPath === '/main/profile') {
       isActivedClick.value = 'Profile'
       isMenuDisabled.value = true
-      // 收起菜单（只在 DOM 元素存在时）
-      if (menu.value && menuSearchUpload.value && isExpand.value) {
+      // 移动端：关闭移动菜单
+      if (isMobile.value) {
+        isMobileMenuOpen.value = false
+      }
+      // PC端：收起菜单（只在 DOM 元素存在时）
+      if (menu.value && menuSearchUpload.value && isExpand.value && !isMobile.value) {
         menu.value.style.width = '0px'
         menuSearchUpload.value.style.display = 'none'
         menu.value.style.borderRight = 'none'
@@ -310,8 +342,12 @@ watch(
     } else if (newPath === '/') {
       isActivedClick.value = 'Home'
       isMenuDisabled.value = false
-      // 展开菜单（只在 DOM 元素存在时）
-      if (menu.value && menuSearchUpload.value && !isExpand.value) {
+      // 移动端：不自动打开菜单，保持关闭状态
+      if (isMobile.value) {
+        isMobileMenuOpen.value = false
+      }
+      // PC端：展开菜单（只在 DOM 元素存在时）
+      if (menu.value && menuSearchUpload.value && !isMobile.value) {
         menu.value.style.width = '220px'
         menuSearchUpload.value.style.display = 'flex'
         menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
@@ -328,7 +364,8 @@ onMounted(() => {
     isActivedClick.value = 'Settings'
     isMenuDisabled.value = true
     isExpand.value = false
-    if (menu.value) {
+    isMobileMenuOpen.value = false
+    if (menu.value && !isMobile.value) {
       menu.value.style.width = '0px'
       menuSearchUpload.value.style.display = 'none'
       menu.value.style.borderRight = 'none'
@@ -337,20 +374,28 @@ onMounted(() => {
     isActivedClick.value = 'Profile'
     isMenuDisabled.value = true
     isExpand.value = false
-    if (menu.value) {
+    isMobileMenuOpen.value = false
+    if (menu.value && !isMobile.value) {
       menu.value.style.width = '0px'
       menuSearchUpload.value.style.display = 'none'
       menu.value.style.borderRight = 'none'
     }
   } else {
-    // 默认状态（主页或其他页面）- 展开菜单
+    // 默认状态（主页或其他页面）
     isActivedClick.value = 'Home'
     isMenuDisabled.value = false
-    isExpand.value = true
-    if (menu.value) {
-      menu.value.style.width = '220px'
-      menuSearchUpload.value.style.display = 'flex'
-      menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
+    isMobileMenuOpen.value = false
+    if (isMobile.value) {
+      // 移动端：菜单默认关闭
+      isExpand.value = false
+    } else {
+      // PC端：展开菜单
+      isExpand.value = true
+      if (menu.value) {
+        menu.value.style.width = '220px'
+        menuSearchUpload.value.style.display = 'flex'
+        menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
+      }
     }
   }
 })
@@ -888,8 +933,19 @@ const deleteFile = async () => {
           <div class="name">{{ userStore.userInfo.username }}</div>
         </div>
       </div>
+      <!-- 移动端菜单遮罩 -->
+      <div
+        class="mobile-menu-overlay"
+        :class="{ show: isMobileMenuOpen }"
+        @click="closeMobileMenu"
+      ></div>
+
       <!-- 抽屉 -->
-      <div class="menu" ref="menu">
+      <div
+        class="menu"
+        ref="menu"
+        :class="{ 'mobile-open': isMobileMenuOpen }"
+      >
         <!-- 笔记列表 -->
         <div class="list">
           <div class="user-title">
@@ -1678,8 +1734,231 @@ const deleteFile = async () => {
 
 // 手机端的适配
 @media (max-width: 768px) {
-  .wrapper .left-nav {
-    display: none;
+  .wrapper {
+    flex-direction: column;
+
+    // 左侧导航栏改为底部导航
+    .left-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: auto;
+      z-index: 100;
+      flex-direction: column-reverse;
+
+      // 导航栏改为底部固定
+      .nav {
+        width: 100%;
+        height: 60px;
+        flex-direction: row;
+        padding: 5px 10px;
+        border-right: none;
+        border-top: 2px solid rgb(20, 31, 48);
+        justify-content: space-around;
+        box-sizing: border-box;
+
+        // 按钮模块横向排列
+        .btn {
+          flex-direction: row;
+          border-bottom: none;
+          margin-bottom: 0;
+          width: auto;
+          gap: 10px;
+
+          .btn-base {
+            height: 45px;
+            width: 45px;
+            margin-bottom: 0;
+            font-size: 22px;
+          }
+        }
+
+        // 小组部分
+        .group {
+          width: auto;
+          flex-direction: row;
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+
+          &::-webkit-scrollbar {
+            display: none;
+          }
+
+          .group-avatars {
+            width: auto;
+
+            ul {
+              display: flex;
+              flex-direction: row;
+              gap: 8px;
+
+              li {
+                width: 45px;
+                height: 45px;
+                margin-bottom: 0;
+                flex-shrink: 0;
+
+                .name {
+                  display: none;
+                }
+              }
+            }
+          }
+
+          .group-change {
+            width: auto;
+            height: auto;
+            flex-direction: row;
+            gap: 8px;
+
+            .btn-base {
+              width: 45px;
+              height: 45px;
+              margin-bottom: 0;
+              font-size: 22px;
+            }
+          }
+        }
+
+        // 个人资料
+        .profile {
+          position: static;
+          width: auto;
+          height: auto;
+          flex-direction: column;
+          border-top: none;
+          padding: 0;
+          gap: 2px;
+
+          .avatar {
+            width: 45px;
+            height: 45px;
+
+            img {
+              height: 45px;
+            }
+          }
+
+          .name {
+            display: block;
+            font-size: 10px;
+            width: auto;
+            text-align: center;
+            color: rgb(255, 255, 255);
+          }
+        }
+      }
+
+      // 抽屉改为全屏覆盖
+      .menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 85% !important;
+        height: calc(100vh - 60px) !important;
+        z-index: 99;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+
+        &.mobile-open {
+          transform: translateX(0);
+        }
+
+        .list {
+          .user-title {
+            height: auto;
+            min-height: 80px;
+            padding: 15px;
+
+            p:nth-child(1) {
+              font-size: 16px;
+            }
+
+            p:nth-child(2) {
+              font-size: 12px;
+            }
+          }
+
+          .list-main {
+            padding: 10px;
+
+            .list-search {
+              margin-bottom: 10px;
+            }
+
+            .list-contents {
+              ul {
+                li {
+                  padding: 12px;
+
+                  .p-title {
+                    font-size: 14px;
+                  }
+
+                  .timeAndTag-wrapper {
+                    .time,
+                    .tag {
+                      font-size: 11px;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 右侧内容区调整
+    .right-content {
+      height: calc(100vh - 60px);
+
+      .title-wrapper {
+        height: 50px;
+        padding: 8px;
+
+        .title {
+          .left {
+            font-size: 18px;
+            width: auto;
+            max-width: 50%;
+          }
+
+          .right {
+            width: auto;
+            gap: 8px;
+
+            .el-button {
+              width: 35px !important;
+              height: 35px !important;
+
+              &:last-child {
+                width: 60px !important;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// 遮罩层（用于移动端菜单）
+.mobile-menu-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 98;
+
+  &.show {
+    display: block;
   }
 }
 </style>

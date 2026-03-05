@@ -416,6 +416,70 @@ defineExpose({
     }
   }
 }
+
+// 手机端适配
+@media (max-width: 768px) {
+  #addNote {
+    width: 90vw;
+    max-width: 400px;
+    max-height: 80vh;
+    padding: 15px;
+
+    .el-form {
+      ::v-deep(.el-upload-dragger) {
+        padding: 20px 10px;
+      }
+
+      ::v-deep(.el-upload__text) {
+        font-size: 13px;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  #addNote {
+    width: 95vw;
+    max-height: 85vh;
+    padding: 12px;
+    border-radius: 12px;
+
+    .el-form {
+      ::v-deep(.el-form-item) {
+        margin-bottom: 12px;
+      }
+
+      ::v-deep(.el-input__wrapper) {
+        height: 32px;
+      }
+
+      ::v-deep(.el-upload-dragger) {
+        padding: 15px 10px;
+
+        .el-icon--upload {
+          font-size: 40px;
+          margin-bottom: 8px;
+        }
+      }
+
+      ::v-deep(.el-upload__text) {
+        font-size: 12px;
+      }
+
+      ::v-deep(.el-upload__tip) {
+        font-size: 11px;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+
+      .el-button {
+        height: 32px;
+        font-size: 13px;
+      }
+    }
+  }
+}
 </style>
 
 <!-- <style>

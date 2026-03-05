@@ -1130,4 +1130,188 @@ color: rgb(107, 114, 128);
     }
   }
 }
+
+// 手机端适配
+@media (max-width: 768px) {
+  :deep(.el-dialog) {
+    width: 95vw !important;
+    margin: 0 auto !important;
+  }
+
+  .change-group-container {
+    .header-actions {
+      margin-bottom: 15px;
+
+      .el-button {
+        font-size: 13px;
+        padding: 8px 15px;
+      }
+    }
+
+    .create-form {
+      padding: 15px;
+
+      :deep(.el-form-item) {
+        margin-bottom: 15px;
+      }
+
+      :deep(.el-form-item__label) {
+        font-size: 13px;
+      }
+    }
+
+    .groups-list {
+      max-height: 400px;
+      min-height: 150px;
+
+      .group-card {
+        padding: 15px;
+        margin-bottom: 12px;
+
+        .group-header {
+          .group-name {
+            font-size: 16px;
+            flex-wrap: wrap;
+            gap: 5px;
+          }
+        }
+
+        .group-info {
+          flex-direction: column;
+          gap: 8px;
+          font-size: 13px;
+        }
+
+        .group-actions {
+          flex-wrap: wrap;
+          gap: 8px;
+
+          .el-button {
+            font-size: 12px;
+            padding: 6px 12px;
+          }
+        }
+      }
+    }
+  }
+
+  // 管理小组对话框
+  .manage-container {
+    .manage-section {
+      margin-bottom: 20px;
+
+      .section-title {
+        font-size: 14px;
+      }
+
+      .name-edit-area {
+        flex-wrap: wrap;
+        gap: 8px;
+
+        .current-name {
+          font-size: 14px;
+          width: 100%;
+          margin-bottom: 5px;
+        }
+
+        .el-button {
+          font-size: 12px;
+          padding: 6px 12px;
+        }
+      }
+
+      .members-list {
+        max-height: 300px;
+
+        .member-item {
+          padding: 12px;
+
+          .member-info {
+            gap: 10px;
+            margin-bottom: 10px;
+
+            .el-avatar {
+              width: 36px !important;
+              height: 36px !important;
+            }
+
+            .member-details {
+              .member-name {
+                font-size: 14px;
+              }
+
+              .member-email {
+                font-size: 12px;
+              }
+            }
+          }
+
+          .member-actions {
+            flex-wrap: wrap;
+            gap: 6px;
+
+            .el-button {
+              font-size: 11px;
+              padding: 5px 10px;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  :deep(.el-dialog__header) {
+    padding: 15px;
+
+    .el-dialog__title {
+      font-size: 15px;
+    }
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 15px;
+  }
+
+  .change-group-container {
+    .create-form {
+      .slider-container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+
+        .el-slider {
+          width: 100%;
+        }
+      }
+    }
+
+    .groups-list {
+      .group-card {
+        padding: 12px;
+
+        .group-actions {
+          .el-button {
+            flex: 1;
+            min-width: 80px;
+          }
+        }
+      }
+    }
+  }
+
+  .manage-container {
+    .manage-section {
+      .member-item {
+        .member-actions {
+          .el-button {
+            flex: 1;
+            min-width: 70px;
+          }
+        }
+      }
+    }
+  }
+}
 </style>

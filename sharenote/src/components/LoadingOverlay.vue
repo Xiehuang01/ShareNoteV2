@@ -47,4 +47,34 @@ defineProps({
     transform: rotate(360deg);
   }
 }
+
+// 手机端适配
+@media (max-width: 768px) {
+  .loading-overlay {
+    border-radius: 8px;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border-width: 3px;
+  }
+
+  .loading-message {
+    font-size: 12px;
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border-width: 3px;
+  }
+
+  .loading-message {
+    font-size: 11px;
+  }
+}
 </style>

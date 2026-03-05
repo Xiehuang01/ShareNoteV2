@@ -315,5 +315,93 @@ defineExpose({
     fill: rgb(68, 78, 97);
   }
 }
+
+// 手机端适配
+@media (max-width: 768px) {
+  :deep(.el-dialog) {
+    width: 95vw !important;
+    margin: 0 auto !important;
+  }
+
+  .join-group-container {
+    .search-box {
+      margin-bottom: 15px;
+
+      :deep(.el-input__inner) {
+        font-size: 14px;
+      }
+
+      :deep(.el-input-group__append) {
+        .el-button {
+          padding: 0 15px;
+        }
+      }
+    }
+
+    .search-results-container {
+      min-height: 150px;
+    }
+
+    .search-results {
+      max-height: 350px;
+
+      .group-item {
+        padding: 12px;
+        margin-bottom: 8px;
+
+        .group-info {
+          .group-name {
+            font-size: 14px;
+          }
+
+          .group-meta {
+            font-size: 12px;
+
+            span {
+              margin-right: 10px;
+            }
+          }
+        }
+
+        .el-button {
+          font-size: 12px;
+          padding: 6px 12px;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  :deep(.el-dialog__header) {
+    padding: 15px;
+
+    .el-dialog__title {
+      font-size: 15px;
+    }
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 15px;
+  }
+
+  .join-group-container {
+    .search-results {
+      .group-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+
+        .group-info {
+          width: 100%;
+        }
+
+        .el-button {
+          width: 100%;
+        }
+      }
+    }
+  }
+}
 </style>
 

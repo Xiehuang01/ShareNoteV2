@@ -1173,4 +1173,370 @@ $diff-removed-bg: rgba(239, 68, 68, 0.15);
     }
   }
 }
+
+// 手机端适配
+@media (max-width: 768px) {
+  :deep(.el-dialog.ai-cursor-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 0 auto !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+
+    .el-dialog__body {
+      padding: 0 !important;
+    }
+  }
+
+  .ai-cursor-container {
+    height: 85vh !important;
+    max-height: 85vh !important;
+    min-height: unset !important;
+  }
+
+  .ai-header {
+    padding: 10px 12px;
+
+    .ai-header-left {
+      gap: 8px;
+
+      .ai-logo {
+        width: 32px;
+        height: 32px;
+
+        .el-icon {
+          font-size: 18px;
+        }
+      }
+
+      .ai-title-section {
+        .ai-title {
+          font-size: 14px;
+        }
+
+        .ai-subtitle {
+          font-size: 11px;
+        }
+      }
+    }
+
+    .ai-header-actions {
+      gap: 6px;
+
+      .ai-icon-btn {
+        width: 30px;
+        height: 30px;
+      }
+    }
+  }
+
+  .quick-actions {
+    padding: 10px 12px;
+    gap: 6px;
+
+    .quick-action-item {
+      padding: 6px 10px;
+
+      .quick-action-icon {
+        font-size: 13px;
+      }
+
+      .quick-action-label {
+        font-size: 12px;
+      }
+    }
+  }
+
+  .messages-container {
+    padding: 12px;
+  }
+
+  .original-text-section {
+    .original-content {
+      padding: 12px;
+
+      pre {
+        font-size: 13px;
+      }
+    }
+  }
+
+  .diff-section {
+    .diff-toolbar {
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 12px;
+
+      .diff-stats {
+        gap: 8px;
+
+        .stat {
+          font-size: 12px;
+          padding: 3px 8px;
+        }
+      }
+
+      .diff-tabs {
+        margin-left: 0;
+        order: 3;
+        width: 100%;
+        justify-content: center;
+
+        .tab-btn {
+          padding: 5px 12px;
+          font-size: 12px;
+        }
+      }
+
+      .diff-actions {
+        padding-left: 0;
+        border-left: none;
+        margin-left: auto;
+
+        .action-link {
+          font-size: 12px;
+
+          span {
+            display: none;
+          }
+
+          .el-icon {
+            font-size: 16px;
+          }
+        }
+      }
+    }
+
+    .diff-content {
+      max-height: 250px;
+
+      .diff-block {
+        .diff-line-numbers {
+          width: 28px;
+          font-size: 11px;
+
+          .line-num {
+            height: 22px;
+            line-height: 22px;
+          }
+        }
+
+        .diff-lines {
+          padding: 3px 8px;
+
+          .diff-line {
+            min-height: 22px;
+            line-height: 22px;
+            font-size: 13px;
+          }
+        }
+
+        .diff-status {
+          padding: 0 8px;
+
+          .status-icon {
+            font-size: 16px;
+          }
+        }
+      }
+    }
+
+    .preview-content {
+      padding: 16px;
+      max-height: 250px;
+
+      pre {
+        font-size: 13px;
+      }
+    }
+  }
+
+  .generate-result {
+    .generated-content {
+      padding: 12px;
+
+      pre {
+        font-size: 13px;
+      }
+    }
+  }
+
+  .input-section {
+    padding: 10px 12px;
+
+    .input-wrapper {
+      padding: 8px;
+
+      .ai-input-textarea {
+        font-size: 13px;
+      }
+
+      .input-actions {
+        margin-top: 6px;
+
+        .input-hint {
+          font-size: 10px;
+        }
+
+        .send-btn {
+          width: 30px;
+          height: 30px;
+        }
+      }
+    }
+  }
+
+  .bottom-actions {
+    padding: 10px 12px;
+    gap: 8px;
+
+    .action-btn {
+      padding: 8px 14px;
+      font-size: 12px;
+
+      .el-icon {
+        font-size: 13px;
+      }
+
+      .pending-count {
+        display: none;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  :deep(.el-dialog.ai-cursor-dialog) {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+  }
+
+  .ai-cursor-container {
+    height: 90vh !important;
+    max-height: 90vh !important;
+  }
+
+  .ai-header {
+    padding: 8px 10px;
+
+    .ai-header-left {
+      .ai-logo {
+        width: 28px;
+        height: 28px;
+
+        .el-icon {
+          font-size: 16px;
+        }
+      }
+
+      .ai-title-section {
+        .ai-title {
+          font-size: 13px;
+        }
+
+        .ai-subtitle {
+          font-size: 10px;
+        }
+      }
+    }
+
+    .ai-header-actions {
+      .ai-icon-btn {
+        width: 28px;
+        height: 28px;
+      }
+    }
+  }
+
+  .quick-actions {
+    padding: 8px 10px;
+
+    .quick-action-item {
+      padding: 5px 8px;
+
+      .quick-action-icon {
+        font-size: 12px;
+      }
+
+      .quick-action-label {
+        font-size: 11px;
+      }
+    }
+  }
+
+  .messages-container {
+    padding: 10px;
+  }
+
+  .diff-section {
+    .diff-toolbar {
+      padding: 8px 10px;
+
+      .diff-actions {
+        gap: 8px;
+      }
+    }
+
+    .diff-content {
+      max-height: 200px;
+    }
+
+    .preview-content {
+      max-height: 200px;
+      padding: 12px;
+    }
+  }
+
+  .input-section {
+    padding: 8px 10px;
+
+    .input-wrapper {
+      padding: 6px;
+    }
+  }
+
+  .bottom-actions {
+    padding: 8px 10px;
+    flex-wrap: wrap;
+
+    .action-btn {
+      flex: 1;
+      min-width: 80px;
+      justify-content: center;
+      padding: 8px 10px;
+    }
+  }
+}
+</style>
+
+<!-- 全局样式，用于覆盖 Element Plus 默认对话框样式 -->
+<style lang="scss">
+// 手机端适配 - 全局覆盖
+@media (max-width: 768px) {
+  .el-dialog.ai-cursor-dialog {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 0 auto !important;
+    border-radius: 12px !important;
+
+    .el-dialog__body {
+      padding: 0 !important;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .el-dialog.ai-cursor-dialog {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+  }
+}
 </style>
