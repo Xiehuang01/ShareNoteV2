@@ -16,6 +16,8 @@ import * as THREE from 'three'
 const form = ref()
 const isRegister = ref(false)
 const isEnabledClicked = ref(true)
+const isLoginLoading = ref(false) // 登录加载状态
+const isRegisterLoading = ref(false) // 注册加载状态
 const userStore = useUserStore()
 const router = useRouter()
 const formModel = ref({
@@ -167,6 +169,7 @@ watch(isRegister, () => {
 // 登录
 const login = async () => {
   await form.value.validate()
+  isLoginLoading.value = true
   try {
     const res = await userLoginServer(formModel.value)
     if (res.status === 'success') {
@@ -177,12 +180,15 @@ const login = async () => {
     }
   } catch (err) {
     ElMessage.error(err.response?.data?.message || '登录失败，请重试')
+  } finally {
+    isLoginLoading.value = false
   }
 }
 
 // 注册
 const register = async () => {
   await form.value.validate()
+  isRegisterLoading.value = true
   try {
     const verifyResult = await eamilVerifyCodeServer(
       formModel.value.email,
@@ -198,6 +204,8 @@ const register = async () => {
     }
   } catch (err) {
     ElMessage.error(err.response?.data?.message || '注册失败，请重试')
+  } finally {
+    isRegisterLoading.value = false
   }
 }
 
@@ -496,8 +504,10 @@ onUnmounted(() => {
                   type="primary"
                   size="large"
                   class="submit-btn"
+                  :loading="isLoginLoading"
+                  :disabled="isLoginLoading"
                 >
-                  登录
+                  {{ isLoginLoading ? '登录中...' : '登录' }}
                 </el-button>
               </el-form-item>
             </div>
@@ -565,8 +575,10 @@ onUnmounted(() => {
                   type="primary"
                   size="large"
                   class="submit-btn"
+                  :loading="isRegisterLoading"
+                  :disabled="isRegisterLoading"
                 >
-                  注册
+                  {{ isRegisterLoading ? '注册中...' : '注册' }}
                 </el-button>
               </el-form-item>
             </div>
