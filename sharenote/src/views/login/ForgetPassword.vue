@@ -140,203 +140,562 @@ const nextStep3 = async () => {
 </script>
 
 <template>
-  <div class="wrapper">
-    <div class="wrapper-findPassword">
-      <div class="wrapper-title">
-        <div class="title">
-          <p>{{ guideTitle }}</p>
+  <div class="forget-page">
+    <!-- 左侧表单卡片 -->
+    <div class="form-card">
+      <div class="card-content">
+        <!-- 标题 -->
+        <div class="brand-header">
+          <h1 class="brand-name">ShareNote</h1>
+          <p class="welcome-text">找回密码</p>
+          <p class="subtitle">通过邮箱验证找回您的账号密码</p>
         </div>
-      </div>
 
-      <div class="wrapper-form">
-        <div class="form">
-          <el-form
-            class="elform"
-            size="large"
-            ref="form"
-            :model="formModel"
-            :rules="rules"
-            autocomplete="off"
-          >
-            <el-form-item prop="email" v-if="step === 1">
-              <div class="label">邮箱</div>
-              <el-input v-model="formModel.email"></el-input>
-            </el-form-item>
-            <h3
-              style="color: #32f18d; margin: 0"
-              v-if="step === 2 || step === 3"
-            >
-              {{ usernameFound }}您好:
-            </h3>
-            <el-form-item prop="code" v-if="step === 2">
-              <div class="label">验证码</div>
-              <el-input v-model="formModel.code"></el-input>
-            </el-form-item>
-            <el-form-item prop="password" v-if="step === 3">
-              <div class="label">重设密码</div>
-              <el-input
-                type="password"
-                v-model="formModel.password"
-                show-password
-              ></el-input>
-            </el-form-item>
-            <el-form-item prop="repassword" v-if="step === 3">
-              <div class="label">重复密码</div>
-              <el-input
-                type="password"
-                v-model="formModel.repassword"
-                show-password
-              ></el-input>
-            </el-form-item>
-            <el-form-item class="item-next">
-              <el-button
-                @click="nextStep"
-                class="button-next"
-                color="32f18d"
-                :icon="ArrowRightBold"
-                circle
-              ></el-button>
-            </el-form-item>
-          </el-form>
+        <!-- 步骤指示器 -->
+        <div class="steps-indicator">
+          <div :class="['step', { active: step >= 1 }]">
+            <div class="step-number">1</div>
+            <div class="step-label">验证邮箱</div>
+          </div>
+          <div class="step-line" :class="{ active: step >= 2 }"></div>
+          <div :class="['step', { active: step >= 2 }]">
+            <div class="step-number">2</div>
+            <div class="step-label">验证码</div>
+          </div>
+          <div class="step-line" :class="{ active: step >= 3 }"></div>
+          <div :class="['step', { active: step >= 3 }]">
+            <div class="step-number">3</div>
+            <div class="step-label">重置密码</div>
+          </div>
         </div>
+
+        <!-- 表单 -->
+        <el-form
+          ref="form"
+          :model="formModel"
+          :rules="rules"
+          autocomplete="off"
+          class="forget-form"
+        >
+          <!-- 步骤1: 输入邮箱 -->
+          <div v-if="step === 1" class="step-content">
+            <el-form-item prop="email">
+              <el-input
+                v-model="formModel.email"
+                placeholder="请输入注册邮箱"
+                size="large"
+              />
+            </el-form-item>
+          </div>
+
+          <!-- 步骤2: 输入验证码 -->
+          <div v-if="step === 2" class="step-content">
+            <div class="username-hint">
+              <span class="username">{{ usernameFound }}</span> 您好！
+            </div>
+            <el-form-item prop="code">
+              <el-input
+                v-model="formModel.code"
+                placeholder="请输入邮箱验证码"
+                size="large"
+              />
+            </el-form-item>
+          </div>
+
+          <!-- 步骤3: 重置密码 -->
+          <div v-if="step === 3" class="step-content">
+            <div class="username-hint">
+              <span class="username">{{ usernameFound }}</span> 您好！
+            </div>
+            <el-form-item prop="password">
+              <el-input
+                v-model="formModel.password"
+                type="password"
+                placeholder="请输入新密码"
+                size="large"
+                show-password
+              />
+            </el-form-item>
+            <el-form-item prop="repassword">
+              <el-input
+                v-model="formModel.repassword"
+                type="password"
+                placeholder="请再次输入新密码"
+                size="large"
+                show-password
+              />
+            </el-form-item>
+          </div>
+
+          <!-- 操作按钮 -->
+          <el-form-item>
+            <el-button
+              @click="nextStep"
+              type="primary"
+              size="large"
+              class="submit-btn"
+            >
+              {{ step === 3 ? '完成重置' : '下一步' }}
+            </el-button>
+          </el-form-item>
+
+          <!-- 返回登录 -->
+          <div class="back-to-login">
+            <a href="/login">返回登录</a>
+          </div>
+        </el-form>
+
+        <!-- 底部版权 -->
+        <div class="footer-text">© 2025 ShareNote. All rights reserved.</div>
       </div>
+    </div>
+
+    <!-- 右侧背景 -->
+    <div class="fluid-background">
+      <div class="fluid-shape shape-1"></div>
+      <div class="fluid-shape shape-2"></div>
+      <div class="fluid-shape shape-3"></div>
+      <div class="fluid-shape shape-4"></div>
+      <div class="gradient-overlay"></div>
     </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
-.wrapper {
-  // 尺寸调整
+.forget-page {
   width: 100vw;
   height: 100vh;
-  // 位置调整
-  position: relative;
-  // 样式调整
-  background-color: #121212;
-  // 子元素位置调整
   display: flex;
-  justify-content: center;
+  background: rgb(3, 6, 23);
+  overflow: hidden;
+}
+
+// 左侧表单卡片
+.form-card {
+  flex: 0 0 480px;
+  display: flex;
   align-items: center;
-  .wrapper-findPassword {
-    width: 50%;
-    height: 55%;
-    background-color: rgba(0, 0, 0, 0.32);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px); /* Safari 支持 */
-    border: 1px solid rgba(50, 240, 140, 0.2); /* 可选：内边框/边界效果 */
-    box-shadow: 0 0 15px rgba(50, 240, 140, 0.2);
-    border-radius: 15px;
-    position: absolute;
+  justify-content: center;
+  padding: 40px;
+  background: rgb(8, 15, 32);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  z-index: 10;
 
-    // 左边部分--title
-    .wrapper-title {
-      width: 30%;
-      height: 100%;
-      // padding: 5px 10px;
-      box-sizing: border-box;
+  .card-content {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .brand-header {
+    text-align: center;
+    margin-bottom: 32px;
+
+    .brand-name {
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #36d399 0%, #16bb82 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0 0 12px 0;
+    }
+
+    .welcome-text {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      margin: 0 0 4px 0;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.5);
+      margin: 0;
+    }
+  }
+
+  // 步骤指示器
+  .steps-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding: 0 20px;
+
+    .step {
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      // background-color: pink;
-      white-space: normal; /* 允许换行 */
-      overflow-wrap: break-word; /* 必要时断行 */
-      position: absolute;
-      left: 0;
-      // background-color: pink;
-      .title {
-        width: 90%;
-        height: 90%;
-        // background-color: rebeccapurple;
-        color: #32f18d;
-        line-height: 1;
-        font-weight: bold;
-        // top: 0;
-        border-right: solid 1px gray;
-        container-type: size;
+      gap: 8px;
 
-        position: absolute;
-        p {
-          margin: 0;
-          padding: 10px;
-          display: block;
-          position: absolute;
-          font-size: 40cqw;
-          top: 0;
+      .step-number {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 600;
+        transition: all 0.3s ease;
+      }
+
+      .step-label {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        transition: all 0.3s ease;
+      }
+
+      &.active {
+        .step-number {
+          background: rgba(54, 211, 153, 0.2);
+          border-color: #36d399;
+          color: #36d399;
+        }
+
+        .step-label {
+          color: #36d399;
         }
       }
     }
 
-    // 右边部分--form
-    .wrapper-form {
-      width: 70%;
-      height: 100%;
-      // background-color: pink;
-      position: absolute;
-      right: 0;
-      .form {
-        width: 100%;
-        height: 100%;
-        // background-color: rgb(255, 159, 175);
-        padding: 30px 20px;
-        box-sizing: border-box;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+    .step-line {
+      flex: 1;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 0 8px;
+      margin-bottom: 24px;
+      transition: all 0.3s ease;
 
-        .label {
-          color: rgb(41, 176, 107);
-        }
+      &.active {
+        background: #36d399;
+      }
+    }
+  }
 
-        /* Scoped 样式穿透 el-input 内部 input */
-        /* Scoped 样式下用 ::v-deep() */
-        ::v-deep(.inp) {
-          overflow: hidden; /* 防止眼睛图标溢出 */
-        }
-        ::v-deep(.el-input__inner) {
-          box-sizing: border-box; /* 防止 padding 破坏圆角 */
-          color: var(--text-color); /* 输入文字颜色 */
-          font-size: medium;
-        }
+  .forget-form {
+    .step-content {
+      min-height: 120px;
+    }
 
-        ::v-deep(.el-input__wrapper) {
-          height: 6vh;
-          border-radius: 5px; /* 容器圆角 */
-          // border: solid 2px rgb(32, 33, 35);
-          background-color: rgb(19, 20, 21);
-          // background-color: transparent;
-          // 外边框用box-shadow画出
-          box-shadow: 0 0 0 1px #202123 inset;
-        }
-        // 当用户聚焦于输入框时
-        :deep(.el-input__wrapper.is-focus) {
-          box-shadow: 0 0 0 1px #4b4c4d inset;
-          background-color: rgb(36, 37, 39);
-        }
-        .item-next {
-          position: relative;
-          .button-next {
-            position: absolute;
-            margin-top: 2px;
-            color: #9d9d9d;
-            right: 0;
-            bottom: -50px;
-          }
-          .button-next:hover {
-            color: #000000;
-          }
+    .username-hint {
+      text-align: center;
+      margin-bottom: 20px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 15px;
+
+      .username {
+        color: #36d399;
+        font-weight: 600;
+      }
+    }
+
+    .el-form-item {
+      margin-bottom: 16px;
+    }
+
+    :deep(.el-input__wrapper) {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      box-shadow: none;
+      padding: 12px 16px;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(54, 211, 153, 0.3);
+      }
+
+      &.is-focus {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: #36d399;
+        box-shadow: 0 0 0 3px rgba(54, 211, 153, 0.1);
+      }
+
+      .el-input__inner {
+        color: #ffffff;
+        font-size: 14px;
+
+        &::placeholder {
+          color: rgba(255, 255, 255, 0.3);
         }
       }
+
+      .el-input__prefix,
+      .el-input__suffix {
+        color: rgba(54, 211, 153, 0.7);
+      }
+    }
+
+    .submit-btn {
+      width: 100%;
+      height: 48px;
+      background: linear-gradient(135deg, #36d399 0%, #16bb82 100%);
+      border: none;
+      color: rgb(3, 6, 23);
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(54, 211, 153, 0.3);
+      margin-top: 8px;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(54, 211, 153, 0.4);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
+
+    .back-to-login {
+      text-align: center;
+      margin-top: 16px;
+
+      a {
+        color: #36d399;
+        text-decoration: none;
+        font-size: 14px;
+        transition: color 0.3s ease;
+
+        &:hover {
+          color: #16bb82;
+        }
+      }
+    }
+  }
+
+  .footer-text {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.3);
+  }
+}
+
+// 右侧背景
+.fluid-background {
+  flex: 1;
+  position: relative;
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1729 100%);
+  overflow: hidden;
+
+  // 动态网格背景
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+      linear-gradient(rgba(54, 211, 153, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(54, 211, 153, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    animation: gridMove 20s linear infinite;
+  }
+
+  // 发光球体
+  .fluid-shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.6;
+    animation: float 15s ease-in-out infinite;
+  }
+
+  .shape-1 {
+    width: 500px;
+    height: 500px;
+    top: -15%;
+    right: -10%;
+    background: radial-gradient(
+      circle,
+      rgba(54, 211, 153, 0.4),
+      rgba(54, 211, 153, 0.1)
+    );
+    animation-delay: 0s;
+  }
+
+  .shape-2 {
+    width: 400px;
+    height: 400px;
+    bottom: -10%;
+    left: 5%;
+    background: radial-gradient(
+      circle,
+      rgba(99, 102, 241, 0.3),
+      rgba(99, 102, 241, 0.1)
+    );
+    animation-delay: 5s;
+  }
+
+  .shape-3 {
+    width: 350px;
+    height: 350px;
+    top: 50%;
+    right: 15%;
+    background: radial-gradient(
+      circle,
+      rgba(236, 72, 153, 0.25),
+      rgba(236, 72, 153, 0.05)
+    );
+    animation-delay: 10s;
+  }
+
+  .shape-4 {
+    width: 300px;
+    height: 300px;
+    top: 20%;
+    left: 20%;
+    background: radial-gradient(
+      circle,
+      rgba(251, 191, 36, 0.2),
+      rgba(251, 191, 36, 0.05)
+    );
+    animation-delay: 7s;
+  }
+
+  .gradient-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      border: 2px solid rgba(54, 211, 153, 0.1);
+      border-radius: 50%;
+      animation: pulse 8s ease-in-out infinite;
+    }
+
+    &::before {
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+    }
+
+    &::after {
+      width: 70%;
+      height: 70%;
+      top: 15%;
+      left: 15%;
+      animation-delay: 4s;
+    }
+  }
+}
+
+@keyframes gridMove {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(50px, 50px);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.6;
+  }
+}
+
+// 移动端适配
+@media (max-width: 1024px) {
+  .forget-page {
+    flex-direction: column;
+  }
+
+  .form-card {
+    flex: none;
+    width: auto;
+    height: 100vh;
+    overflow-y: auto;
+    box-shadow: none;
+    border-bottom: 2px solid rgb(20, 31, 48);
+  }
+
+  .fluid-background {
+    flex: 1;
+    height: 0vh;
+
+    .fluid-shape {
+      width: 300px !important;
+      height: 300px !important;
     }
   }
 }
 
 @media (max-width: 768px) {
-  .wrapper .wrapper-findPassword {
-    width: 100%;
-    height: 100%;
-    .wrapper-title .title p {
-      font-size: 80cqw;
+  .form-card {
+    padding: 30px 20px;
+
+    .card-content {
+      max-width: 100%;
     }
+
+    .brand-header {
+      .brand-name {
+        font-size: 28px;
+      }
+
+      .welcome-text {
+        font-size: 18px;
+      }
+
+      .subtitle {
+        font-size: 12px;
+      }
+    }
+
+    .steps-indicator {
+      padding: 0 10px;
+
+      .step {
+        .step-number {
+          width: 32px;
+          height: 32px;
+          font-size: 14px;
+        }
+
+        .step-label {
+          font-size: 11px;
+        }
+      }
+    }
+  }
+
+  .fluid-background {
+    display: none;
   }
 }
 </style>

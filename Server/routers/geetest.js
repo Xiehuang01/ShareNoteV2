@@ -8,7 +8,7 @@ const router = express.Router();
 const geetestConfig = {
   id: '0646f178d6514fc91a6bc0aa848b5b7d', //公钥 public key
   key: 'b925e84653f29440fcbbd7bd5b039086',// 密钥 secret key
-  server:'http://gcaptcha4.geetest.com/validate' // 服务地址server url
+  server:'    ' // 服务地址server url
 }
 
 // 设置路由处理函数，用于验证

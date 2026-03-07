@@ -537,6 +537,7 @@ $diff-added-bg: rgba(34, 197, 94, 0.15);
 $diff-removed: #EF4444;
 $diff-removed-bg: rgba(239, 68, 68, 0.15);
 
+
 :deep(.ai-cursor-dialog) {
   border-radius: 16px;
   overflow: hidden;

@@ -390,11 +390,11 @@ onMounted(() => {
       isExpand.value = false
     } else {
       // PC端：展开菜单
-      isExpand.value = true
-      if (menu.value) {
-        menu.value.style.width = '220px'
-        menuSearchUpload.value.style.display = 'flex'
-        menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
+    isExpand.value = true
+    if (menu.value) {
+      menu.value.style.width = '220px'
+      menuSearchUpload.value.style.display = 'flex'
+      menu.value.style.borderRight = '1px solid rgb(20, 31, 48)'
       }
     }
   }
@@ -1784,7 +1784,7 @@ const deleteFile = async () => {
           -ms-overflow-style: none;
 
           &::-webkit-scrollbar {
-            display: none;
+    display: none;
           }
 
           .group-avatars {
